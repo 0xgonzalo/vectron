@@ -1,0 +1,20 @@
+# Build output
+/build/
+build/
+cmake-build-*/
+out/
+
+# macOS
+.DS_Store
+
+# IDE / editor
+.idea/
+.vscode/
+*.xcodeproj/
+*.xcworkspace/
+
+# Logs
+*.log
+
+# Superpowers SDD scratch (progress ledger, task briefs, review packages)
+/.superpowers/
