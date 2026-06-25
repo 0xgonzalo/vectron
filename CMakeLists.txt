@@ -15,6 +15,7 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_plugin(Vectron
     PRODUCT_NAME              "Vectron"
     COMPANY_NAME              "Vectron Audio"
+    BUNDLE_ID                 com.vectronaudio.Vectron
     PLUGIN_MANUFACTURER_CODE  Vctn
     PLUGIN_CODE               Vec1
     FORMATS                   VST3 Standalone

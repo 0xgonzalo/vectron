@@ -32,17 +32,22 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         apvts.getRawParameterValue ("amp_decay")->load(),
         apvts.getRawParameterValue ("amp_sustain")->load(),
         apvts.getRawParameterValue ("amp_release")->load() };
+    const float tuneHz = apvts.getRawParameterValue ("master_tune")->load();
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto* v = dynamic_cast<VectronVoice*> (synth.getVoice (i)))
+        {
             v->setAmpAdsr (ampParams);
+            v->setMasterTune (tuneHz);
+        }
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
 
     const float volDb = apvts.getRawParameterValue ("master_volume")->load();
     masterGain.setTargetValue (juce::Decibels::decibelsToGain (volDb, -60.0f));
-    buffer.applyGainRamp (0, buffer.getNumSamples(),
-                          masterGain.getCurrentValue(),
-                          masterGain.skip (buffer.getNumSamples()));
+    const int numSamples  = buffer.getNumSamples();
+    const float startGain = masterGain.getCurrentValue();
+    const float endGain   = masterGain.skip (numSamples);
+    buffer.applyGainRamp (0, numSamples, startGain, endGain);
 }
 
 juce::AudioProcessorEditor* VectronProcessor::createEditor()

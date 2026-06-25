@@ -7,6 +7,7 @@ class VectronVoice : public juce::SynthesiserVoice
 public:
     void prepare (double sampleRate, int blockSize);
     void setAmpAdsr (const juce::ADSR::Parameters& p) { ampAdsr.setParameters (p); }
+    void setMasterTune (float a4Hz) { masterTuneHz = a4Hz; }
 
     bool canPlaySound (juce::SynthesiserSound*) override;
     void startNote (int midiNoteNumber, float velocity,
@@ -20,4 +21,5 @@ private:
     PolyBlepOscillator osc;
     juce::ADSR ampAdsr;
     float level = 0.0f;
+    float masterTuneHz = 440.0f;
 };

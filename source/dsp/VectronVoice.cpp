@@ -16,7 +16,7 @@ bool VectronVoice::canPlaySound (juce::SynthesiserSound* sound)
 void VectronVoice::startNote (int midiNoteNumber, float velocity,
                               juce::SynthesiserSound*, int)
 {
-    osc.setFrequency ((float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber));
+    osc.setFrequency ((float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber, masterTuneHz));
     osc.reset (0.0f);
     level = velocity;
     ampAdsr.noteOn();
@@ -51,7 +51,7 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
         if (! ampAdsr.isActive())
         {
             clearCurrentNote();
-            break;
+            return;
         }
     }
 }
