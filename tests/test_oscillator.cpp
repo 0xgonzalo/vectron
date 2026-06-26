@@ -37,3 +37,42 @@ TEST_CASE ("saw oscillator output stays bounded")
         REQUIRE (s <=  1.05f);
     }
 }
+
+TEST_CASE ("pulse oscillator stays bounded")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Pulse);
+    osc.setPulseWidth (0.5f);
+    osc.setFrequency (220.0f);
+    osc.reset (0.0f);
+
+    for (int i = 0; i < 96000; ++i)
+    {
+        const float s = osc.processSample();
+        REQUIRE (s >= -1.1f);
+        REQUIRE (s <=  1.1f);
+    }
+}
+
+TEST_CASE ("pulse duty cycle sets the DC mean")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Pulse);
+    osc.setFrequency (100.0f);
+    osc.reset (0.0f);
+
+    auto meanFor = [&osc] (float pw)
+    {
+        osc.setPulseWidth (pw);
+        osc.reset (0.0f);
+        double sum = 0.0;
+        const int n = 48000;
+        for (int i = 0; i < n; ++i) sum += osc.processSample();
+        return (float) (sum / n);
+    };
+
+    REQUIRE (std::abs (meanFor (0.5f) - 0.0f)  < 0.02f);   // 2*0.5-1 = 0
+    REQUIRE (std::abs (meanFor (0.25f) + 0.5f) < 0.03f);   // 2*0.25-1 = -0.5
+}
