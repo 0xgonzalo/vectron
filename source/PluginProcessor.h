@@ -36,5 +36,34 @@ private:
     juce::Synthesiser synth;
     static constexpr int kNumVoices = 16;
     juce::SmoothedValue<float> masterGain;
+
+    // Cached APVTS parameter pointers — resolved once in constructor, read lock-free on audio thread.
+    std::atomic<float>* pAmpAttack    { nullptr };
+    std::atomic<float>* pAmpDecay     { nullptr };
+    std::atomic<float>* pAmpSustain   { nullptr };
+    std::atomic<float>* pAmpRelease   { nullptr };
+    std::atomic<float>* pMasterVolume { nullptr };
+    std::atomic<float>* pMasterTune   { nullptr };
+
+    // Per-oscillator [A=0, B=1, C=2, D=3] — mirrors VectronVoiceParams layout
+    std::atomic<float>* pOscWave[4]       { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscOct[4]        { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscCoarse[4]     { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscFine[4]       { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscPw[4]         { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscLevel[4]      { nullptr, nullptr, nullptr, nullptr };
+    std::atomic<float>* pOscPhaseReset[4] { nullptr, nullptr, nullptr, nullptr };
+
+    // Vector mix/position params
+    std::atomic<float>* pVectorX     { nullptr };
+    std::atomic<float>* pVectorY     { nullptr };
+    std::atomic<float>* pVectorXfade { nullptr };
+    std::atomic<float>* pVectorLevel { nullptr };
+
+    // Per-axis LFO [x=0, y=1] — mirrors VectronVoiceParams lfoRate/lfoDepth/lfoShape
+    std::atomic<float>* pLfoRate[2]  { nullptr, nullptr };
+    std::atomic<float>* pLfoDepth[2] { nullptr, nullptr };
+    std::atomic<float>* pLfoShape[2] { nullptr, nullptr };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VectronProcessor)
 };

@@ -9,6 +9,51 @@ VectronProcessor::VectronProcessor()
     for (int i = 0; i < kNumVoices; ++i)
         synth.addVoice (new VectronVoice());
     synth.addSound (new VectronSound());
+
+    // Resolve all parameter pointers once here — juce::String construction is fine off the audio thread.
+    pAmpAttack    = apvts.getRawParameterValue ("amp_attack");
+    pAmpDecay     = apvts.getRawParameterValue ("amp_decay");
+    pAmpSustain   = apvts.getRawParameterValue ("amp_sustain");
+    pAmpRelease   = apvts.getRawParameterValue ("amp_release");
+    pMasterVolume = apvts.getRawParameterValue ("master_volume");
+    pMasterTune   = apvts.getRawParameterValue ("master_tune");
+
+    const char* oscIds[4] { "oscA", "oscB", "oscC", "oscD" };
+    for (int i = 0; i < 4; ++i)
+    {
+        juce::String id { oscIds[i] };
+        pOscWave[i]       = apvts.getRawParameterValue (id + "_wave");
+        pOscOct[i]        = apvts.getRawParameterValue (id + "_oct");
+        pOscCoarse[i]     = apvts.getRawParameterValue (id + "_coarse");
+        pOscFine[i]       = apvts.getRawParameterValue (id + "_fine");
+        pOscPw[i]         = apvts.getRawParameterValue (id + "_pw");
+        pOscLevel[i]      = apvts.getRawParameterValue (id + "_level");
+        pOscPhaseReset[i] = apvts.getRawParameterValue (id + "_phaseReset");
+    }
+
+    pVectorX     = apvts.getRawParameterValue ("vector_x");
+    pVectorY     = apvts.getRawParameterValue ("vector_y");
+    pVectorXfade = apvts.getRawParameterValue ("vector_xfade");
+    pVectorLevel = apvts.getRawParameterValue ("vector_level");
+
+    const char* axisIds[2] { "vector_x", "vector_y" };
+    for (int a = 0; a < 2; ++a)
+    {
+        juce::String id { axisIds[a] };
+        pLfoRate[a]  = apvts.getRawParameterValue (id + "LfoRate");
+        pLfoDepth[a] = apvts.getRawParameterValue (id + "LfoDepth");
+        pLfoShape[a] = apvts.getRawParameterValue (id + "LfoShape");
+    }
+
+    // Fail loudly in debug if any param ID was misspelt.
+    jassert (pAmpAttack && pAmpDecay && pAmpSustain && pAmpRelease);
+    jassert (pMasterVolume && pMasterTune);
+    for (int i = 0; i < 4; ++i)
+        jassert (pOscWave[i] && pOscOct[i] && pOscCoarse[i] && pOscFine[i]
+                 && pOscPw[i] && pOscLevel[i] && pOscPhaseReset[i]);
+    jassert (pVectorX && pVectorY && pVectorXfade && pVectorLevel);
+    for (int a = 0; a < 2; ++a)
+        jassert (pLfoRate[a] && pLfoDepth[a] && pLfoShape[a]);
 }
 
 void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -26,40 +71,36 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
+    // All reads use pre-resolved atomic pointers — no allocations, no locks on this thread.
+
     // Push current ADSR params into voices (control rate, per block).
     const juce::ADSR::Parameters ampParams {
-        apvts.getRawParameterValue ("amp_attack")->load(),
-        apvts.getRawParameterValue ("amp_decay")->load(),
-        apvts.getRawParameterValue ("amp_sustain")->load(),
-        apvts.getRawParameterValue ("amp_release")->load() };
-    const float tuneHz = apvts.getRawParameterValue ("master_tune")->load();
-
-    auto raw = [this] (const char* id) { return apvts.getRawParameterValue (id)->load(); };
+        pAmpAttack->load(),
+        pAmpDecay->load(),
+        pAmpSustain->load(),
+        pAmpRelease->load() };
+    const float tuneHz = pMasterTune->load();
 
     VectronVoiceParams vp;
-    const char* oscIds[4] { "oscA", "oscB", "oscC", "oscD" };
     for (int i = 0; i < 4; ++i)
     {
-        const juce::String id { oscIds[i] };
-        vp.oscWave[i]       = (int)   raw ((id + "_wave").toRawUTF8());
-        vp.oscOct[i]        = (int)   raw ((id + "_oct").toRawUTF8());
-        vp.oscCoarse[i]     = (int)   raw ((id + "_coarse").toRawUTF8());
-        vp.oscFine[i]       =         raw ((id + "_fine").toRawUTF8());
-        vp.oscPw[i]         =         raw ((id + "_pw").toRawUTF8());
-        vp.oscLevel[i]      =         raw ((id + "_level").toRawUTF8());
-        vp.oscPhaseReset[i] =         raw ((id + "_phaseReset").toRawUTF8()) > 0.5f;
+        vp.oscWave[i]       = (int)  pOscWave[i]->load();
+        vp.oscOct[i]        = (int)  pOscOct[i]->load();
+        vp.oscCoarse[i]     = (int)  pOscCoarse[i]->load();
+        vp.oscFine[i]       =        pOscFine[i]->load();
+        vp.oscPw[i]         =        pOscPw[i]->load();
+        vp.oscLevel[i]      =        pOscLevel[i]->load();
+        vp.oscPhaseReset[i] =        pOscPhaseReset[i]->load() > 0.5f;
     }
-    vp.xfade       = (int) raw ("vector_xfade");
-    vp.vectorLevel =       raw ("vector_level");
-    vp.baseX       =       raw ("vector_x");
-    vp.baseY       =       raw ("vector_y");
-    const char* axisId[2] { "vector_x", "vector_y" };
+    vp.xfade       = (int) pVectorXfade->load();
+    vp.vectorLevel =       pVectorLevel->load();
+    vp.baseX       =       pVectorX->load();
+    vp.baseY       =       pVectorY->load();
     for (int a = 0; a < 2; ++a)
     {
-        const juce::String id { axisId[a] };
-        vp.lfoRate[a]  =       raw ((id + "LfoRate").toRawUTF8());
-        vp.lfoDepth[a] =       raw ((id + "LfoDepth").toRawUTF8());
-        vp.lfoShape[a] = (int) raw ((id + "LfoShape").toRawUTF8());
+        vp.lfoRate[a]  =       pLfoRate[a]->load();
+        vp.lfoDepth[a] =       pLfoDepth[a]->load();
+        vp.lfoShape[a] = (int) pLfoShape[a]->load();
     }
 
     for (int i = 0; i < synth.getNumVoices(); ++i)
@@ -72,8 +113,7 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
 
-    const float volDb = apvts.getRawParameterValue ("master_volume")->load();
-    masterGain.setTargetValue (juce::Decibels::decibelsToGain (volDb, -60.0f));
+    masterGain.setTargetValue (juce::Decibels::decibelsToGain (pMasterVolume->load(), -60.0f));
     const int numSamples  = buffer.getNumSamples();
     const float startGain = masterGain.getCurrentValue();
     const float endGain   = masterGain.skip (numSamples);
