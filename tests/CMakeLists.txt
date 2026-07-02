@@ -5,7 +5,10 @@ FetchContent_Declare(Catch2
     GIT_SHALLOW    TRUE)
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(VectronTests test_oscillator.cpp)
+add_executable(VectronTests
+    test_oscillator.cpp
+    test_vector_engine.cpp
+    ${CMAKE_SOURCE_DIR}/source/dsp/osc/VectorEngine.cpp)
 target_include_directories(VectronTests PRIVATE ${CMAKE_SOURCE_DIR}/source)
 target_compile_features(VectronTests PRIVATE cxx_std_20)
 target_link_libraries(VectronTests PRIVATE Catch2::Catch2WithMain)
