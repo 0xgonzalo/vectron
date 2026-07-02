@@ -8,6 +8,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(VectronTests
     test_oscillator.cpp
     test_vector_engine.cpp
+    test_vector_lfo.cpp
     ${CMAKE_SOURCE_DIR}/source/dsp/osc/VectorEngine.cpp)
 target_include_directories(VectronTests PRIVATE ${CMAKE_SOURCE_DIR}/source)
 target_compile_features(VectronTests PRIVATE cxx_std_20)
