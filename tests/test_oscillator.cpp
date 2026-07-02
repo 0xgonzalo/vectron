@@ -76,3 +76,68 @@ TEST_CASE ("pulse duty cycle sets the DC mean")
     REQUIRE (std::abs (meanFor (0.5f) - 0.0f)  < 0.02f);   // 2*0.5-1 = 0
     REQUIRE (std::abs (meanFor (0.25f) + 0.5f) < 0.03f);   // 2*0.25-1 = -0.5
 }
+
+TEST_CASE ("triangle oscillator runs at the requested frequency")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Triangle);
+    osc.setFrequency (440.0f);
+    osc.reset (0.0f);
+
+    int risingCrossings = 0;
+    float prev = osc.processSample();
+    for (int i = 1; i < 48000; ++i)
+    {
+        const float s = osc.processSample();
+        if (prev < 0.0f && s >= 0.0f) ++risingCrossings;
+        prev = s;
+    }
+    REQUIRE (risingCrossings >= 439);
+    REQUIRE (risingCrossings <= 441);
+}
+
+TEST_CASE ("triangle reaches its peaks and stays bounded")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Triangle);
+    osc.setFrequency (50.0f);
+    osc.reset (0.0f);
+
+    float maxV = -2.0f, minV = 2.0f;
+    for (int i = 0; i < 4800; ++i)   // ~5 cycles
+    {
+        const float s = osc.processSample();
+        maxV = std::max (maxV, s);
+        minV = std::min (minV, s);
+        REQUIRE (s >= -1.05f);
+        REQUIRE (s <=  1.05f);
+    }
+    REQUIRE (maxV > 0.97f);
+    REQUIRE (minV < -0.97f);
+}
+
+TEST_CASE ("triangle rising ramp is linear (constant slope)")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Triangle);
+    osc.setFrequency (20.0f);        // low freq: dt tiny, corner correction negligible
+    osc.reset (0.0f);
+
+    // Collect the first ~quarter cycle (phase 0 -> 0.25), away from corners.
+    // At 20 Hz / 48 kHz one cycle = 2400 samples; quarter = 600. Sample 50..550.
+    float prev = osc.processSample();
+    float firstSlope = 0.0f;
+    for (int i = 1; i <= 550; ++i)
+    {
+        const float s = osc.processSample();
+        const float slope = s - prev;
+        if (i == 50) firstSlope = slope;
+        if (i >= 50 && i <= 550)
+            REQUIRE (std::abs (slope - firstSlope) < 1.0e-3f);  // linear, not curved like a sine
+        prev = s;
+    }
+    REQUIRE (firstSlope > 0.0f);     // rising
+}

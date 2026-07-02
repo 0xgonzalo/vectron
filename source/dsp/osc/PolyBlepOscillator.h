@@ -24,9 +24,17 @@ public:
                 value = std::sin (kTwoPi * t);
                 break;
             case Wave::Triangle:
-                // TODO: implement triangle wave
-                value = 0.0f;
+            {
+                if      (t < 0.25f) value = 4.0f * t;          // 0 -> +1, slope +4
+                else if (t < 0.75f) value = 2.0f - 4.0f * t;   // +1 -> -1, slope -4
+                else                value = 4.0f * t - 4.0f;   // -1 -> 0, slope +4
+
+                float rp = t - 0.25f; if (rp < 0.0f) rp += 1.0f;   // rel. to peak corner
+                float rt = t - 0.75f; if (rt < 0.0f) rt += 1.0f;   // rel. to trough corner
+                value += -8.0f * polyBlamp (rp, increment);        // peak: slope step +4 -> -4
+                value +=  8.0f * polyBlamp (rt, increment);        // trough: slope step -4 -> +4
                 break;
+            }
             case Wave::Saw:
                 value  = 2.0f * t - 1.0f;          // naive saw [-1,1]
                 value -= polyBlep (t, increment);  // correct the wrap discontinuity
@@ -60,6 +68,15 @@ private:
         if (dt <= 0.0f) return 0.0f;
         if (t < dt)            { t /= dt;              return (t + t) - (t * t) - 1.0f; }
         if (t > 1.0f - dt)     { t = (t - 1.0f) / dt;  return (t * t) + (t + t) + 1.0f; }
+        return 0.0f;
+    }
+
+    // Integral of polyBlep — corrects slope (1st-derivative) discontinuities.
+    static float polyBlamp (float t, float dt) noexcept
+    {
+        if (dt <= 0.0f) return 0.0f;
+        if (t < dt)            { const float a = t / dt;        return dt * (a * a - a * a * a / 3.0f - a); }
+        if (t > 1.0f - dt)     { const float b = (t - 1.0f) / dt; return dt * ((b + 1.0f) * (b + 1.0f) * (b + 1.0f) / 3.0f); }
         return 0.0f;
     }
 
