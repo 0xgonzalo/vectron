@@ -51,7 +51,7 @@ public:
         }
 
         phase += increment;
-        if (phase >= 1.0f) phase -= 1.0f;
+        phase -= std::floor (phase);  // robust wrap: handles any increment, keeps phase in [0,1)
         return value;
     }
 
@@ -60,7 +60,18 @@ private:
 
     void updateIncrement() noexcept
     {
-        increment = (sampleRate > 0.0) ? static_cast<float> (frequency / sampleRate) : 0.0f;
+        if (sampleRate > 0.0)
+        {
+            // Clamp to 0.45 * sampleRate: PolyBLEP is meaningless past Nyquist and
+            // the naive phase wrap (phase -= 1.0f) is only correct while increment < 1.
+            const float maxFreq = static_cast<float> (sampleRate * 0.45);
+            const float clampedFreq = std::min (frequency, maxFreq);
+            increment = static_cast<float> (clampedFreq / sampleRate);
+        }
+        else
+        {
+            increment = 0.0f;
+        }
     }
 
     static float polyBlep (float t, float dt) noexcept

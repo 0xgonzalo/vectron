@@ -9,6 +9,7 @@ void VectronVoice::prepare (double sampleRate, int /*blockSize*/)
     ampAdsr.setSampleRate (sampleRate);
     baseX.reset (sampleRate, 0.01);
     baseY.reset (sampleRate, 0.01);
+    vectorLevel.reset (sampleRate, 0.01);
     applyParams();
 }
 
@@ -33,6 +34,7 @@ void VectronVoice::applyParams() noexcept
 
     baseX.setTargetValue (params.baseX);
     baseY.setTargetValue (params.baseY);
+    vectorLevel.setTargetValue (params.vectorLevel);
 }
 
 bool VectronVoice::canPlaySound (juce::SynthesiserSound* sound)
@@ -49,6 +51,7 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
     lfo[1].reset();
     baseX.setCurrentAndTargetValue (params.baseX);
     baseY.setCurrentAndTargetValue (params.baseY);
+    vectorLevel.setCurrentAndTargetValue (params.vectorLevel);
     level = velocity;
     ampAdsr.noteOn();
 }
@@ -80,7 +83,7 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
         engine.setVectorPosition (fx, fy);
 
         const float env = ampAdsr.getNextSample();
-        const float s   = engine.processSample() * params.vectorLevel * env * level * 0.3f;
+        const float s   = engine.processSample() * vectorLevel.getNextValue() * env * level * 0.3f;
 
         for (int ch = 0; ch < output.getNumChannels(); ++ch)
             output.addSample (ch, startSample + i, s);

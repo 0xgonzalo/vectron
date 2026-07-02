@@ -43,6 +43,7 @@ private:
     VectorEngine engine;
     VectorLfo    lfo[2];                 // [0]=X, [1]=Y
     juce::SmoothedValue<float> baseX, baseY;
+    juce::SmoothedValue<float> vectorLevel;
     juce::ADSR   ampAdsr;
     VectronVoiceParams params;
     float level = 0.0f;

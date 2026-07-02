@@ -141,3 +141,19 @@ TEST_CASE ("triangle rising ramp is linear (constant slope)")
     }
     REQUIRE (firstSlope > 0.0f);     // rising
 }
+
+TEST_CASE ("oscillator stays bounded when detune pushes past Nyquist")
+{
+    PolyBlepOscillator osc;
+    osc.setSampleRate (48000.0);
+    osc.setWave (PolyBlepOscillator::Wave::Saw);
+    osc.setFrequency (66000.0f);   // > sample rate, like MIDI 96 + 61 semitones of detune
+    osc.reset (0.0f);
+    for (int i = 0; i < 48000; ++i)
+    {
+        const float s = osc.processSample();
+        REQUIRE (std::isfinite (s));
+        REQUIRE (s >= -1.5f);
+        REQUIRE (s <=  1.5f);
+    }
+}
