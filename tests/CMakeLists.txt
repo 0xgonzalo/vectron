@@ -10,6 +10,7 @@ add_executable(VectronTests
     test_vector_engine.cpp
     test_vector_lfo.cpp
     test_svf_filter.cpp
+    test_sub_oscillator.cpp
     ${CMAKE_SOURCE_DIR}/source/dsp/osc/VectorEngine.cpp)
 target_include_directories(VectronTests PRIVATE ${CMAKE_SOURCE_DIR}/source)
 target_compile_features(VectronTests PRIVATE cxx_std_20)
