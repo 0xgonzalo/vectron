@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <algorithm>
 #include "dsp/noise/NoiseGenerator.h"
 
 // Ratio of first-difference energy to signal energy — a crude spectral-tilt metric.
@@ -113,4 +114,59 @@ TEST_CASE ("noise filter type shapes the spectrum")
 
     // LP on white -> darker (low tilt); HP on white -> brighter (high tilt).
     REQUIRE (tiltRatio (hp, 96000) > tiltRatio (lp, 96000));
+}
+
+TEST_CASE ("sample-and-hold holds between rate ticks with no glide")
+{
+    NoiseGenerator g;
+    g.setSampleRate (48000.0);
+    g.setColor (0.0f);
+    g.setShRate (10.0f);        // one step = 4800 samples
+    g.setShGlide (0.0f);
+
+    g.processSample();
+    float prev = g.getSampleHold();
+    int changes = 0;
+    for (int i = 1; i < 4700; ++i)          // safely within the first step
+    {
+        g.processSample();
+        const float v = g.getSampleHold();
+        if (std::abs (v - prev) > 1.0e-6f) ++changes;
+        prev = v;
+    }
+    REQUIRE (changes == 0);
+
+    int stepChanges = 0;
+    float held = prev;
+    for (int i = 0; i < 96000; ++i)         // ~2 s -> ~20 steps
+    {
+        g.processSample();
+        const float v = g.getSampleHold();
+        if (std::abs (v - held) > 1.0e-6f) { ++stepChanges; held = v; }
+    }
+    REQUIRE (stepChanges >= 5);
+}
+
+TEST_CASE ("sample-and-hold glide smooths transitions")
+{
+    NoiseGenerator g;
+    g.setSampleRate (48000.0);
+    g.setColor (0.0f);
+    g.setShRate (10.0f);
+    g.setShGlide (0.8f);
+
+    g.processSample();
+    float prev = g.getSampleHold();
+    float maxDelta = 0.0f, minV = 1.0e9f, maxV = -1.0e9f;
+    for (int i = 0; i < 96000; ++i)
+    {
+        g.processSample();
+        const float v = g.getSampleHold();
+        maxDelta = std::max (maxDelta, std::abs (v - prev));
+        minV = std::min (minV, v);
+        maxV = std::max (maxV, v);
+        prev = v;
+    }
+    REQUIRE (maxDelta < 0.1f);        // smoothed: no instant jumps
+    REQUIRE (maxV - minV > 0.05f);    // but still moving over time
 }
