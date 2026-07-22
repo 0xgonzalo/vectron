@@ -65,5 +65,22 @@ private:
     std::atomic<float>* pLfoDepth[2] { nullptr, nullptr };
     std::atomic<float>* pLfoShape[2] { nullptr, nullptr };
 
+    // Sub oscillator
+    std::atomic<float>* pSubWave  { nullptr };
+    std::atomic<float>* pSubOct   { nullptr };
+    std::atomic<float>* pSubLevel { nullptr };
+
+    // Noise generator
+    std::atomic<float>* pNoiseColor      { nullptr };
+    std::atomic<float>* pNoiseTuned      { nullptr };
+    std::atomic<float>* pNoisePitch      { nullptr };
+    std::atomic<float>* pNoiseKeytrack   { nullptr };
+    std::atomic<float>* pNoiseFilterType { nullptr };
+    std::atomic<float>* pNoiseCutoff     { nullptr };
+    std::atomic<float>* pNoiseReso       { nullptr };
+    std::atomic<float>* pNoiseLevel      { nullptr };
+    std::atomic<float>* pNoiseShRate     { nullptr };
+    std::atomic<float>* pNoiseShGlide    { nullptr };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VectronProcessor)
 };

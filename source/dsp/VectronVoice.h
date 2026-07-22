@@ -2,6 +2,8 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "osc/VectorEngine.h"
 #include "osc/VectorLfo.h"
+#include "osc/SubOscillator.h"
+#include "noise/NoiseGenerator.h"
 
 struct VectronVoiceParams
 {
@@ -19,6 +21,23 @@ struct VectronVoiceParams
     float lfoRate[2]       { 1.0f, 1.0f };  // [0]=X, [1]=Y
     float lfoDepth[2]      { 0.0f, 0.0f };
     int   lfoShape[2]      { 0, 0 };
+
+    // Sub oscillator
+    int   subWave  { 0 };      // 0 Sine, 1 Triangle, 2 Square
+    int   subOct   { 0 };      // 0 -> -1 oct, 1 -> -2 oct
+    float subLevel { 0.0f };
+
+    // Noise generator
+    float noiseColor      { 0.0f };
+    bool  noiseTuned      { false };
+    float noisePitch      { 0.0f };
+    float noiseKeytrack   { 100.0f };
+    int   noiseFilterType { 2 };     // 0 HP, 1 BP, 2 LP
+    float noiseCutoff     { 20000.0f };
+    float noiseReso       { 0.0f };
+    float noiseLevel      { 0.0f };
+    float noiseShRate     { 5.0f };
+    float noiseShGlide    { 0.0f };
 };
 
 class VectronVoice : public juce::SynthesiserVoice
@@ -44,6 +63,9 @@ private:
     VectorLfo    lfo[2];                 // [0]=X, [1]=Y
     juce::SmoothedValue<float> baseX, baseY;
     juce::SmoothedValue<float> vectorLevel;
+    SubOscillator subOsc;
+    NoiseGenerator noiseGen;
+    juce::SmoothedValue<float> subLevel;
     juce::ADSR   ampAdsr;
     VectronVoiceParams params;
     float level = 0.0f;

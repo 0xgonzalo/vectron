@@ -32,7 +32,8 @@ target_sources(Vectron PRIVATE
     source/PluginProcessor.cpp
     source/params/ParameterLayout.cpp
     source/dsp/VectronVoice.cpp
-    source/dsp/osc/VectorEngine.cpp)
+    source/dsp/osc/VectorEngine.cpp
+    source/dsp/noise/NoiseGenerator.cpp)
 
 target_include_directories(Vectron PRIVATE source)
 

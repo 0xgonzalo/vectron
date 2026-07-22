@@ -45,6 +45,21 @@ VectronProcessor::VectronProcessor()
         pLfoShape[a] = apvts.getRawParameterValue (id + "LfoShape");
     }
 
+    pSubWave  = apvts.getRawParameterValue ("sub_wave");
+    pSubOct   = apvts.getRawParameterValue ("sub_oct");
+    pSubLevel = apvts.getRawParameterValue ("sub_level");
+
+    pNoiseColor      = apvts.getRawParameterValue ("noise_color");
+    pNoiseTuned      = apvts.getRawParameterValue ("noise_tuned");
+    pNoisePitch      = apvts.getRawParameterValue ("noise_pitch");
+    pNoiseKeytrack   = apvts.getRawParameterValue ("noise_keytrack");
+    pNoiseFilterType = apvts.getRawParameterValue ("noise_filterType");
+    pNoiseCutoff     = apvts.getRawParameterValue ("noise_cutoff");
+    pNoiseReso       = apvts.getRawParameterValue ("noise_reso");
+    pNoiseLevel      = apvts.getRawParameterValue ("noise_level");
+    pNoiseShRate     = apvts.getRawParameterValue ("noise_sh_rate");
+    pNoiseShGlide    = apvts.getRawParameterValue ("noise_sh_glide");
+
     // Fail loudly in debug if any param ID was misspelt.
     jassert (pAmpAttack && pAmpDecay && pAmpSustain && pAmpRelease);
     jassert (pMasterVolume && pMasterTune);
@@ -54,6 +69,9 @@ VectronProcessor::VectronProcessor()
     jassert (pVectorX && pVectorY && pVectorXfade && pVectorLevel);
     for (int a = 0; a < 2; ++a)
         jassert (pLfoRate[a] && pLfoDepth[a] && pLfoShape[a]);
+    jassert (pSubWave && pSubOct && pSubLevel);
+    jassert (pNoiseColor && pNoiseTuned && pNoisePitch && pNoiseKeytrack && pNoiseFilterType
+             && pNoiseCutoff && pNoiseReso && pNoiseLevel && pNoiseShRate && pNoiseShGlide);
 }
 
 void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -102,6 +120,21 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
         vp.lfoDepth[a] =       pLfoDepth[a]->load();
         vp.lfoShape[a] = (int) pLfoShape[a]->load();
     }
+
+    vp.subWave  = (int) pSubWave->load();
+    vp.subOct   = (int) pSubOct->load();
+    vp.subLevel =       pSubLevel->load();
+
+    vp.noiseColor      =        pNoiseColor->load();
+    vp.noiseTuned      =        pNoiseTuned->load() > 0.5f;
+    vp.noisePitch      =        pNoisePitch->load();
+    vp.noiseKeytrack   =        pNoiseKeytrack->load();
+    vp.noiseFilterType = (int)  pNoiseFilterType->load();
+    vp.noiseCutoff     =        pNoiseCutoff->load();
+    vp.noiseReso       =        pNoiseReso->load();
+    vp.noiseLevel      =        pNoiseLevel->load();
+    vp.noiseShRate     =        pNoiseShRate->load();
+    vp.noiseShGlide    =        pNoiseShGlide->load();
 
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto* v = dynamic_cast<VectronVoice*> (synth.getVoice (i)))
