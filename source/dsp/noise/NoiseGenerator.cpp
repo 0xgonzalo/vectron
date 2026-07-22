@@ -12,8 +12,12 @@ void NoiseGenerator::setSampleRate (double sr) noexcept
 {
     sampleRate = sr;
     tunedBp.setSampleRate (sr);
-    tunedBp.setMode (SvfFilter::Mode::BP);
     noiseFilter.setSampleRate (sr);
+    const float tau = 0.015f * (float) sr;                  // 15 ms
+    smoothCoef = (sr > 0.0) ? (1.0f - std::exp (-1.0f / tau)) : 1.0f;
+    levelCurrent  = levelTarget;
+    cutoffCurrent = cutoffTarget;
+    noiseFilter.setCutoff (cutoffCurrent);
     setShRate (shRate);
     setShGlide (shGlide);
     updateTuned();
@@ -61,10 +65,17 @@ float NoiseGenerator::processSample() noexcept
     if (shPhase >= 1.0f) { shPhase -= 1.0f; shTarget = colorOut; }
     shValue += (shTarget - shValue) * shGlideCoef;
 
+    // Smooth the always-on filter cutoff per sample (zipper-free automation).
+    cutoffCurrent += (cutoffTarget - cutoffCurrent) * smoothCoef;
+    noiseFilter.setCutoff (cutoffCurrent);
+
     // Tuned band-pass (optional) then the always-on noise filter.
     float out = tuned ? tunedBp.processSample (colorOut) : colorOut;
     out = noiseFilter.processSample (out);
-    return out * level;
+
+    // Smooth the output level per sample.
+    levelCurrent += (levelTarget - levelCurrent) * smoothCoef;
+    return out * levelCurrent;
 }
 
 void NoiseGenerator::setNoiseFilter (FilterType type, float cutoffHz, float reso) noexcept
@@ -77,8 +88,8 @@ void NoiseGenerator::setNoiseFilter (FilterType type, float cutoffHz, float reso
         case FilterType::LP: m = SvfFilter::Mode::LP; break;
     }
     noiseFilter.setMode (m);
-    noiseFilter.setCutoff (cutoffHz);
     noiseFilter.setResonance (reso);
+    cutoffTarget = cutoffHz;
 }
 
 void NoiseGenerator::updateTuned() noexcept
@@ -121,4 +132,6 @@ void NoiseGenerator::reset() noexcept
     tunedBp.reset();
     noiseFilter.reset();
     shPhase = 0.0f; shTarget = 0.0f; shValue = 0.0f;
+    levelCurrent  = levelTarget;
+    cutoffCurrent = cutoffTarget;
 }

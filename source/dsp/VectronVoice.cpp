@@ -66,6 +66,9 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
     engine.noteOn();
     subOsc.setNoteFrequency ((float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber, masterTuneHz));
     subOsc.noteOn();
+    // Note: noiseGen is intentionally NOT reset here — noise has no phase to click on,
+    // so carrying pink/brown/tuned-BP/S&H state across a voice-steal gives continuous
+    // texture rather than a reset transient. (engine + subOsc DO reset phase.)
     noiseGen.setNoteFrequency ((float) juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber, masterTuneHz));
     lfo[0].reset();
     lfo[1].reset();

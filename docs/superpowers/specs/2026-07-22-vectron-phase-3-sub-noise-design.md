@@ -68,7 +68,7 @@ Sum happens exactly where Phase 4's filter/drive will later insert (between mix 
 - API: `setSampleRate(double)`, `setCutoff(float hz)`, `setResonance(float 0..1)`, `setMode(LP|BP|HP|Notch)`, `float processSample(float x)`, `reset()`.
 - Prewarp: `g = tan(π·fc/fs)`. Damping `k = 2 − 2·r` from resonance (clamp `r` below the self-oscillation edge for stability). States `s1, s2`.
 - One-sample update; outputs: LP = `v2`, BP = `v1`, HP = `x − k·v1 − v2`, Notch = `x − k·v1`.
-- `reset()` zeroes states. Cutoff clamped to `[20, min(20000, 0.45·fs)]`.
+- `reset()` zeroes states. Cutoff clamped to `[20, 0.99·Nyquist]` (stability-only bound).
 
 ### SubOscillator
 - Holds a `PolyBlepOscillator`. `setWave(Sine|Triangle|Square)` → Square maps to `Pulse` at pw 0.5.

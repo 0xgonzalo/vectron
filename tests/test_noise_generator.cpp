@@ -170,3 +170,26 @@ TEST_CASE ("sample-and-hold glide smooths transitions")
     REQUIRE (maxDelta < 0.1f);        // smoothed: no instant jumps
     REQUIRE (maxV - minV > 0.05f);    // but still moving over time
 }
+
+TEST_CASE ("noise level change is smoothed, not instant")
+{
+    NoiseGenerator g;
+    g.setSampleRate (48000.0);
+    g.setColor (0.0f);
+    g.setNoiseFilter (NoiseGenerator::FilterType::LP, 20000.0f, 0.0f);
+    g.setLevel (1.0f);
+    for (int i = 0; i < 48000; ++i) g.processSample();   // prime to full level
+
+    g.setLevel (0.0f);                                    // drop level
+    float maxAbsShort = 0.0f;
+    for (int i = 0; i < 48; ++i)                          // first ~1 ms
+        maxAbsShort = std::max (maxAbsShort, std::abs (g.processSample()));
+
+    for (int i = 0; i < 9600; ++i) g.processSample();     // let it settle (~200 ms)
+    float maxAbsLate = 0.0f;
+    for (int i = 0; i < 480; ++i)
+        maxAbsLate = std::max (maxAbsLate, std::abs (g.processSample()));
+
+    REQUIRE (maxAbsShort > 0.05f);   // did NOT snap to silence instantly (smoothing active)
+    REQUIRE (maxAbsLate  < 0.01f);   // fully faded after settling
+}

@@ -9,6 +9,8 @@ class SvfFilter
 public:
     enum class Mode { LP, BP, HP, Notch };
 
+    SvfFilter() noexcept { update(); }
+
     void setSampleRate (double sr) noexcept { sampleRate = sr; update(); }
     void setCutoff (float hz)      noexcept { cutoff = hz; update(); }
     void setResonance (float r)    noexcept { res = std::clamp (r, 0.0f, 1.0f); update(); }

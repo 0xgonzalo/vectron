@@ -12,7 +12,7 @@ public:
 
     void setSampleRate (double sr) noexcept;
     void setColor (float c) noexcept { color = (c < 0.0f) ? 0.0f : (c > 1.0f ? 1.0f : c); }
-    void setLevel (float l) noexcept { level = l; }
+    void setLevel (float l) noexcept { levelTarget = l; }
 
     void setTuned (bool on) noexcept            { tuned = on; }
     void setTunedPitch (float semis) noexcept   { tunedPitch = semis; updateTuned(); }
@@ -35,7 +35,11 @@ private:
 
     double sampleRate = 44100.0;
     float  color      = 0.0f;
-    float  level      = 0.0f;
+
+    // Per-sample parameter smoothing (zipper-free level + noise-filter cutoff).
+    float levelTarget   = 0.0f, levelCurrent   = 0.0f;
+    float cutoffTarget  = 1000.0f, cutoffCurrent = 1000.0f;
+    float smoothCoef    = 1.0f;
 
     // color-path state
     float    pb0 = 0.0f, pb1 = 0.0f, pb2 = 0.0f;             // Kellet pink poles

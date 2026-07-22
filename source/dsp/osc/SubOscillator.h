@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include <algorithm>
 #include "PolyBlepOscillator.h"
 
 // Sub oscillator: a single band-limited waveform an octave (or two) below the note.
@@ -21,7 +22,7 @@ public:
         }
     }
 
-    void setOctave (int oct) noexcept          { octave = oct; updateFrequency(); }  // -1 or -2
+    void setOctave (int oct) noexcept          { octave = std::clamp (oct, -2, -1); updateFrequency(); }  // -1 or -2
     void setNoteFrequency (float hz) noexcept  { baseHz = hz;  updateFrequency(); }
     void noteOn() noexcept                     { osc.reset (0.0f); }
     float processSample() noexcept             { return osc.processSample(); }
