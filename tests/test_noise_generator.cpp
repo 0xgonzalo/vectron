@@ -83,3 +83,34 @@ TEST_CASE ("noise loudness stays in a sane range across the color sweep")
         REQUIRE (r < 3.0f);
     }
 }
+
+TEST_CASE ("tuned noise centroid tracks pitch")
+{
+    auto tiltForPitch = [] (float pitch)
+    {
+        NoiseGenerator g;
+        g.setSampleRate (48000.0);
+        g.setColor (0.0f);                                                    // white in
+        g.setNoiseFilter (NoiseGenerator::FilterType::LP, 20000.0f, 0.0f);    // transparent
+        g.setLevel (1.0f);
+        g.setNoteFrequency (440.0f);
+        g.setKeytrack (100.0f);
+        g.setTunedPitch (pitch);
+        g.setTuned (true);
+        return tiltRatio (g, 96000);
+    };
+    // Higher tuned pitch -> BP centre higher -> brighter -> larger tilt ratio.
+    REQUIRE (tiltForPitch (12.0f) > tiltForPitch (-12.0f));
+}
+
+TEST_CASE ("noise filter type shapes the spectrum")
+{
+    NoiseGenerator lp, hp;
+    lp.setSampleRate (48000.0); lp.setColor (0.0f); lp.setTuned (false); lp.setLevel (1.0f);
+    lp.setNoiseFilter (NoiseGenerator::FilterType::LP, 1000.0f, 0.0f);
+    hp.setSampleRate (48000.0); hp.setColor (0.0f); hp.setTuned (false); hp.setLevel (1.0f);
+    hp.setNoiseFilter (NoiseGenerator::FilterType::HP, 1000.0f, 0.0f);
+
+    // LP on white -> darker (low tilt); HP on white -> brighter (high tilt).
+    REQUIRE (tiltRatio (hp, 96000) > tiltRatio (lp, 96000));
+}
