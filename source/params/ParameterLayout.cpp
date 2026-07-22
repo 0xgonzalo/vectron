@@ -21,6 +21,13 @@ namespace vectron
         return r;
     }
 
+    static juce::NormalisableRange<float> logRange (float lo, float hi)
+    {
+        juce::NormalisableRange<float> r { lo, hi, 0.0f };
+        r.setSkewForCentre (std::sqrt (lo * hi));   // geometric centre -> log-like taper
+        return r;
+    }
+
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -88,6 +95,36 @@ namespace vectron
             layout.add (std::make_unique<APC> (juce::ParameterID { id + "LfoShape", 1 },
                 name + " LFO Shape", lfoShapes, 0));
         }
+
+        // --- Sub oscillator (PRD §5.3) ---
+        layout.add (std::make_unique<APC> (juce::ParameterID { "sub_wave", 1 },
+            "Sub Wave", juce::StringArray { "Sine", "Triangle", "Square" }, 0));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "sub_oct", 1 },
+            "Sub Octave", juce::StringArray { "-1", "-2" }, 0));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "sub_level", 1 },
+            "Sub Level", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+
+        // --- Noise generator (PRD §5.4) ---
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_color", 1 },
+            "Noise Color", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APB> (juce::ParameterID { "noise_tuned", 1 },
+            "Noise Tuned", false));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_pitch", 1 },
+            "Noise Pitch", juce::NormalisableRange<float> { -24.0f, 24.0f, 0.01f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_keytrack", 1 },
+            "Noise Keytrack", juce::NormalisableRange<float> { 0.0f, 100.0f, 0.1f }, 100.0f));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "noise_filterType", 1 },
+            "Noise Filter Type", juce::StringArray { "HP", "BP", "LP" }, 2));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_cutoff", 1 },
+            "Noise Cutoff", logRange (20.0f, 20000.0f), 20000.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_reso", 1 },
+            "Noise Resonance", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_level", 1 },
+            "Noise Level", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_sh_rate", 1 },
+            "Noise S&H Rate", logRange (0.1f, 50.0f), 5.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "noise_sh_glide", 1 },
+            "Noise S&H Glide", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
 
         return layout;
     }
