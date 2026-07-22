@@ -1165,10 +1165,10 @@ git commit -m "feat: wire VectorEngine + vector LFOs into the voice and processo
 
 ## Verification (Phase 2 end-to-end)
 
-- [ ] `cmake --build build && ctest --test-dir build --output-on-failure` — all oscillator, vector-engine, and vector-LFO tests pass.
-- [ ] Plugin builds VST3 + Standalone with no new warnings.
-- [ ] Manual host check (Task 7 Step 6): moving `vector_x`/`vector_y` audibly changes timbre; vector LFO depth animates it.
-- [ ] (If installed) `pluginval --strictness-level 10 --validate-in-process <path-to-Vectron.vst3>` passes — defer to a follow-up if pluginval is not on the machine; note it as an open item.
+- [x] `cmake --build build && ctest --test-dir build --output-on-failure` — all oscillator, vector-engine, and vector-LFO tests pass. **✅ 18/18 pass (2026-07-22).**
+- [x] Plugin builds VST3 + Standalone with no new warnings. **✅ `Vectron.exe` + `Vectron.vst3` build clean. Note: the VST3 post-build auto-install to `C:\Program Files\Common Files\VST3` fails without admin — the `.vst3` bundle itself builds fine at `build/Vectron_artefacts/Debug/VST3/`.**
+- [ ] Manual host check (Task 7 Step 6): moving `vector_x`/`vector_y` audibly changes timbre; vector LFO depth animates it. **⏳ PENDING USER — requires listening; launch `build/Vectron_artefacts/Debug/Standalone/Vectron.exe`.**
+- [x] `pluginval --strictness-level 10 --validate-in-process <path-to-Vectron.vst3>` passes. **✅ PASSED strictness 10 (2026-07-22) — all sections completed, 0 failures, "SUCCESS". pluginval downloaded to scratchpad (not on machine).**
 
 ## Notes / Decisions Locked (Phase 2)
 
