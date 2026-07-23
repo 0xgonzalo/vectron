@@ -57,6 +57,18 @@ namespace
         return (float) std::sqrt (acc / n);
     }
 
+    float rmsDifferenceWindow (const juce::AudioBuffer<float>& a, const juce::AudioBuffer<float>& b,
+                               int start, int len)
+    {
+        double acc = 0.0;
+        for (int i = start; i < start + len; ++i)
+        {
+            const double d = (double) a.getSample (0, i) - (double) b.getSample (0, i);
+            acc += d * d;
+        }
+        return (float) std::sqrt (acc / len);
+    }
+
     bool finiteAndAudible (const juce::AudioBuffer<float>& buf, const char* name)
     {
         double acc = 0.0;
@@ -181,6 +193,77 @@ int main()
         const float lrRms = (float) std::sqrt (lr / buf.getNumSamples());
         std::printf ("pan L/R diff rms = %.5f\n", lrRms);
         if (lrRms < 1.0e-3f) { std::printf ("FAIL: LFO->Pan leaves L == R\n"); return 1; }
+    }
+
+    // Trajectory 1 (acceptance, PRD §12.6): Loop mode audibly moves the vector.
+    juce::AudioBuffer<float> loopBuf;
+    {
+        VectronProcessor p;
+        setParam (p, "traj_mode", 2.0f);               // Loop
+        render (p, loopBuf);
+        if (! finiteAndAudible (loopBuf, "traj loop")) return 1;
+        const float diff = rmsDifference (loopBuf, baseBuf);
+        std::printf ("traj loop diff rms = %.5f\n", diff);
+        if (diff < 1.0e-3f) { std::printf ("FAIL: trajectory Loop has no audible effect\n"); return 1; }
+    }
+
+    // Trajectory 2: One-Shot settles and holds at Pn == corner C (-1,-1).
+    {
+        VectronProcessor p;
+        setParam (p, "traj_mode", 1.0f);               // One-Shot
+        setParam (p, "traj_rate", 4.0f);               // whole path done in ~375 ms
+        juce::AudioBuffer<float> oneShot;
+        render (p, oneShot);
+
+        VectronProcessor ref;                          // static patch parked at Pn
+        setParam (ref, "vector_x", -1.0f);
+        setParam (ref, "vector_y", -1.0f);
+        juce::AudioBuffer<float> refBuf;
+        render (ref, refBuf);
+
+        const int start = (int) kSampleRate;           // 1 s: well past the path + smoothing
+        const int len   = oneShot.getNumSamples() - start;
+        const float diff = rmsDifferenceWindow (oneShot, refBuf, start, len);
+        std::printf ("traj one-shot settle diff rms = %.5f\n", diff);
+        if (diff > 1.0e-3f) { std::printf ("FAIL: One-Shot does not settle at Pn\n"); return 1; }
+    }
+
+    // Trajectory 3: matrix LFO1 -> Traj Depth fades the trajectory in and out.
+    {
+        VectronProcessor still;
+        setParam (still, "traj_mode", 2.0f);
+        setParam (still, "traj_depth", 0.0f);          // parked until modulated
+        juce::AudioBuffer<float> stillBuf;
+        render (still, stillBuf);
+
+        VectronProcessor p;
+        setParam (p, "traj_mode", 2.0f);
+        setParam (p, "traj_depth", 0.0f);
+        setParam (p, "lfo1_rate", 5.0f);
+        setParam (p, "mod1_src", 0.0f);                // LFO 1
+        setParam (p, "mod1_dst", 25.0f);               // Traj Depth
+        setParam (p, "mod1_amt", 1.0f);
+        setParam (p, "mod1_en",  1.0f);
+        juce::AudioBuffer<float> buf;
+        render (p, buf);
+        const float diff = rmsDifference (buf, stillBuf);
+        std::printf ("lfo->trajDepth diff rms = %.5f\n", diff);
+        if (diff < 1.0e-3f) { std::printf ("FAIL: LFO->Traj Depth routing has no audible effect\n"); return 1; }
+    }
+
+    // Trajectory 4: editing a point in the state is heard (listener -> snapshot path).
+    {
+        VectronProcessor p;
+        setParam (p, "traj_mode", 2.0f);
+        auto traj = p.apvts.state.getChildWithName (vectron::traj_ids::tree);
+        if (! traj.isValid() || traj.getNumChildren() < 2)
+        { std::printf ("FAIL: TRAJECTORY state child missing\n"); return 1; }
+        traj.getChild (1).setProperty (vectron::traj_ids::x, -1.0f, nullptr);   // B -> top-left
+        juce::AudioBuffer<float> buf;
+        render (p, buf);
+        const float diff = rmsDifference (buf, loopBuf);
+        std::printf ("traj point-edit diff rms = %.5f\n", diff);
+        if (diff < 1.0e-3f) { std::printf ("FAIL: editing a trajectory point has no audible effect\n"); return 1; }
     }
 
     std::printf ("SMOKE OK\n");
