@@ -78,6 +78,35 @@ VectronProcessor::VectronProcessor()
     pFiltRelease     = apvts.getRawParameterValue ("filt_release");
     pFiltVelAmt      = apvts.getRawParameterValue ("filt_velAmt");
 
+    for (int n = 0; n < 2; ++n)
+    {
+        const juce::String id = "lfo" + juce::String (n + 1);
+        pModLfoShape[n]    = apvts.getRawParameterValue (id + "_shape");
+        pModLfoRate[n]     = apvts.getRawParameterValue (id + "_rate");
+        pModLfoSync[n]     = apvts.getRawParameterValue (id + "_sync");
+        pModLfoSyncDiv[n]  = apvts.getRawParameterValue (id + "_syncDiv");
+        pModLfoPhase[n]    = apvts.getRawParameterValue (id + "_phase");
+        pModLfoFadeIn[n]   = apvts.getRawParameterValue (id + "_fadeIn");
+        pModLfoPolarity[n] = apvts.getRawParameterValue (id + "_polarity");
+        pModLfoMode[n]     = apvts.getRawParameterValue (id + "_mode");
+    }
+
+    pModAttack  = apvts.getRawParameterValue ("mod_attack");
+    pModDecay   = apvts.getRawParameterValue ("mod_decay");
+    pModSustain = apvts.getRawParameterValue ("mod_sustain");
+    pModRelease = apvts.getRawParameterValue ("mod_release");
+    pModVelAmt  = apvts.getRawParameterValue ("mod_velAmt");
+    pAmpVelSens = apvts.getRawParameterValue ("amp_velSens");
+
+    for (int s = 0; s < 8; ++s)
+    {
+        const juce::String id = "mod" + juce::String (s + 1);
+        pModSrc[s] = apvts.getRawParameterValue (id + "_src");
+        pModDst[s] = apvts.getRawParameterValue (id + "_dst");
+        pModAmt[s] = apvts.getRawParameterValue (id + "_amt");
+        pModEn[s]  = apvts.getRawParameterValue (id + "_en");
+    }
+
     // Fail loudly in debug if any param ID was misspelt.
     jassert (pAmpAttack && pAmpDecay && pAmpSustain && pAmpRelease);
     jassert (pMasterVolume && pMasterTune);
@@ -94,6 +123,12 @@ VectronProcessor::VectronProcessor()
              && pFilterDrive && pFilterKeytrack && pFilterEnvAmount);
     jassert (pDriveType && pDriveAmount && pDriveTrim && pDrivePosition);
     jassert (pFiltAttack && pFiltDecay && pFiltSustain && pFiltRelease && pFiltVelAmt);
+    for (int n = 0; n < 2; ++n)
+        jassert (pModLfoShape[n] && pModLfoRate[n] && pModLfoSync[n] && pModLfoSyncDiv[n]
+                 && pModLfoPhase[n] && pModLfoFadeIn[n] && pModLfoPolarity[n] && pModLfoMode[n]);
+    jassert (pModAttack && pModDecay && pModSustain && pModRelease && pModVelAmt && pAmpVelSens);
+    for (int s = 0; s < 8; ++s)
+        jassert (pModSrc[s] && pModDst[s] && pModAmt[s] && pModEn[s]);
 }
 
 void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)

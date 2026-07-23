@@ -1,4 +1,6 @@
 #include "ParameterLayout.h"
+#include "dsp/mod/ModMatrix.h"
+#include <iterator>
 
 namespace vectron
 {
@@ -165,6 +167,83 @@ namespace vectron
             "Filter Release", timeRange (15.0f), 0.3f));
         layout.add (std::make_unique<APF> (juce::ParameterID { "filt_velAmt", 1 },
             "Filter Env Velocity", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+
+        // --- Phase 5: mod LFOs (PRD §6.2) ---
+        const juce::StringArray modLfoShapes { "Sine", "Triangle", "Saw Up", "Saw Down",
+                                               "Square", "S&H", "Random" };
+        const juce::StringArray syncDivs { "1/1", "1/2.", "1/2", "1/2T", "1/4.", "1/4", "1/4T",
+                                           "1/8.", "1/8", "1/8T", "1/16.", "1/16", "1/16T",
+                                           "1/32.", "1/32", "1/32T" };
+        juce::NormalisableRange<float> modLfoRate { 0.01f, 40.0f, 0.0f };
+        modLfoRate.setSkewForCentre (2.0f);
+
+        for (int n = 1; n <= 2; ++n)
+        {
+            const juce::String id   = "lfo" + juce::String (n);
+            const juce::String name = "LFO " + juce::String (n);
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_shape", 1 },
+                name + " Shape", modLfoShapes, 0));
+            layout.add (std::make_unique<APF> (juce::ParameterID { id + "_rate", 1 },
+                name + " Rate", modLfoRate, 1.0f));
+            layout.add (std::make_unique<APB> (juce::ParameterID { id + "_sync", 1 },
+                name + " Sync", false));
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_syncDiv", 1 },
+                name + " Sync Div", syncDivs, 5));                       // 1/4
+            layout.add (std::make_unique<APF> (juce::ParameterID { id + "_phase", 1 },
+                name + " Phase", juce::NormalisableRange<float> { 0.0f, 360.0f, 0.1f }, 0.0f));
+            layout.add (std::make_unique<APF> (juce::ParameterID { id + "_fadeIn", 1 },
+                name + " Fade In", juce::NormalisableRange<float> { 0.0f, 5.0f, 0.001f }, 0.0f));
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_polarity", 1 },
+                name + " Polarity", juce::StringArray { "Bipolar", "Unipolar" }, 0));
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_mode", 1 },
+                name + " Mode", juce::StringArray { "Poly", "Global" }, 0));
+        }
+
+        // --- Phase 5: mod env + amp velocity (PRD §6.1, §5.7) ---
+        layout.add (std::make_unique<APF> (juce::ParameterID { "mod_attack", 1 },
+            "Mod Attack",  timeRange (10.0f), 0.005f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "mod_decay", 1 },
+            "Mod Decay",   timeRange (10.0f), 0.2f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "mod_sustain", 1 },
+            "Mod Sustain", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.8f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "mod_release", 1 },
+            "Mod Release", timeRange (15.0f), 0.3f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "mod_velAmt", 1 },
+            "Mod Env Velocity", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "amp_velSens", 1 },
+            "Amp Velocity Sens", juce::NormalisableRange<float> { 0.0f, 1.0f }, 1.0f));
+
+        // --- Phase 5: mod matrix (PRD §6.3) ---
+        // Order MUST match the ModMatrix enums — they are the contract.
+        static const char* const srcNames[] = { "LFO 1", "LFO 2", "Amp Env", "Filter Env",
+                                                "Mod Env", "Velocity", "Mod Wheel", "Aftertouch",
+                                                "Key Track", "Noise S&H", "Random" };
+        static const char* const dstNames[] = { "Vector X", "Vector Y",
+                                                "Osc A Pitch", "Osc B Pitch", "Osc C Pitch", "Osc D Pitch",
+                                                "Osc A PW", "Osc B PW", "Osc C PW", "Osc D PW",
+                                                "Osc A Level", "Osc B Level", "Osc C Level", "Osc D Level",
+                                                "Sub Level", "Noise Level", "Noise Color", "Noise Cutoff",
+                                                "Filter Cutoff", "Filter Reso", "Drive Amount", "Amp Level",
+                                                "LFO1 Rate", "LFO2 Rate", "Pan" };
+        static_assert (std::size (srcNames) == (size_t) ModMatrix::kNumSources);
+        static_assert (std::size (dstNames) == (size_t) ModMatrix::kNumDests);
+
+        const juce::StringArray srcChoices { srcNames, (int) std::size (srcNames) };
+        const juce::StringArray dstChoices { dstNames, (int) std::size (dstNames) };
+
+        for (int s = 1; s <= 8; ++s)
+        {
+            const juce::String id   = "mod" + juce::String (s);
+            const juce::String name = "Mod " + juce::String (s);
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_src", 1 },
+                name + " Source", srcChoices, 0));
+            layout.add (std::make_unique<APC> (juce::ParameterID { id + "_dst", 1 },
+                name + " Dest", dstChoices, 0));
+            layout.add (std::make_unique<APF> (juce::ParameterID { id + "_amt", 1 },
+                name + " Amount", juce::NormalisableRange<float> { -1.0f, 1.0f }, 0.0f));
+            layout.add (std::make_unique<APB> (juce::ParameterID { id + "_en", 1 },
+                name + " Enable", false));
+        }
 
         return layout;
     }

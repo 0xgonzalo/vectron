@@ -101,5 +101,32 @@ private:
     std::atomic<float>* pFiltRelease     { nullptr };
     std::atomic<float>* pFiltVelAmt      { nullptr };
 
+    // Phase 5: mod LFOs [lfo1=0, lfo2=1]
+    std::atomic<float>* pModLfoShape[2]    { nullptr, nullptr };
+    std::atomic<float>* pModLfoRate[2]     { nullptr, nullptr };
+    std::atomic<float>* pModLfoSync[2]     { nullptr, nullptr };
+    std::atomic<float>* pModLfoSyncDiv[2]  { nullptr, nullptr };
+    std::atomic<float>* pModLfoPhase[2]    { nullptr, nullptr };
+    std::atomic<float>* pModLfoFadeIn[2]   { nullptr, nullptr };
+    std::atomic<float>* pModLfoPolarity[2] { nullptr, nullptr };
+    std::atomic<float>* pModLfoMode[2]     { nullptr, nullptr };
+
+    // Phase 5: mod env + amp velocity
+    std::atomic<float>* pModAttack  { nullptr };
+    std::atomic<float>* pModDecay   { nullptr };
+    std::atomic<float>* pModSustain { nullptr };
+    std::atomic<float>* pModRelease { nullptr };
+    std::atomic<float>* pModVelAmt  { nullptr };
+    std::atomic<float>* pAmpVelSens { nullptr };
+
+    // Phase 5: mod matrix slots
+    std::atomic<float>* pModSrc[8] {};
+    std::atomic<float>* pModDst[8] {};
+    std::atomic<float>* pModAmt[8] {};
+    std::atomic<float>* pModEn[8]  {};
+
+    // Global-mode LFO master phase accumulators (cycles, unwrapped; audio thread only)
+    double masterLfoPhase[2] { 0.0, 0.0 };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VectronProcessor)
 };
