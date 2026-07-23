@@ -1,8 +1,9 @@
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "dsp/VectronVoice.h"
+#include "dsp/osc/VectorTrajectory.h"
 
-class VectronProcessor : public juce::AudioProcessor
+class VectronProcessor : public juce::AudioProcessor, private juce::ValueTree::Listener
 {
 public:
     VectronProcessor();
@@ -127,6 +128,40 @@ private:
 
     // Global-mode LFO master phase accumulators (cycles, unwrapped; audio thread only)
     double masterLfoPhase[2] { 0.0, 0.0 };
+
+    // Phase 6: trajectory params
+    std::atomic<float>* pTrajMode      { nullptr };
+    std::atomic<float>* pTrajDepth     { nullptr };
+    std::atomic<float>* pTrajRate      { nullptr };
+    std::atomic<float>* pTrajSync      { nullptr };
+    std::atomic<float>* pTrajLoopStart { nullptr };
+    std::atomic<float>* pTrajLoopEnd   { nullptr };
+    std::atomic<float>* pTrajLoopDir   { nullptr };
+    std::atomic<float>* pTrajInterp    { nullptr };
+    std::atomic<float>* pTrajTrigger   { nullptr };
+    std::atomic<float>* pTrajRetrigger { nullptr };
+    std::atomic<float>* pTrajRecPoints { nullptr };
+
+    // Phase 6: trajectory model handoff (spec decision 3). Message thread rewrites
+    // sharedTrajModel under trajLock and bumps trajVersion; the audio thread TRY-locks
+    // on version change and copies into audioTrajModel, keeping last-good on failure.
+    vectron::TrajectoryModel sharedTrajModel;
+    juce::SpinLock trajLock;
+    std::atomic<int> trajVersion { 1 };
+    vectron::TrajectoryModel audioTrajModel;
+    int  audioTrajVersion  = 0;
+    vectron::TrajectoryPlayhead masterTraj;      // free-running, always Loop semantics
+    bool masterTrajStarted = false;
+
+    void ensureTrajectoryState();
+    void refreshTrajectoryModel();
+    void maybeRefreshTrajectory (const juce::ValueTree& changed);
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
+    void valueTreeChildAdded (juce::ValueTree&, juce::ValueTree&) override;
+    void valueTreeChildRemoved (juce::ValueTree&, juce::ValueTree&, int) override;
+    void valueTreeChildOrderChanged (juce::ValueTree&, int, int) override;
+    void valueTreeParentChanged (juce::ValueTree&) override {}
+    void valueTreeRedirected (juce::ValueTree&) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VectronProcessor)
 };

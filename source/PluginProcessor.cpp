@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "params/ParameterLayout.h"
+#include "params/TrajectoryState.h"
 #include "dsp/VectronSound.h"
 
 VectronProcessor::VectronProcessor()
@@ -107,6 +108,18 @@ VectronProcessor::VectronProcessor()
         pModEn[s]  = apvts.getRawParameterValue (id + "_en");
     }
 
+    pTrajMode      = apvts.getRawParameterValue ("traj_mode");
+    pTrajDepth     = apvts.getRawParameterValue ("traj_depth");
+    pTrajRate      = apvts.getRawParameterValue ("traj_rate");
+    pTrajSync      = apvts.getRawParameterValue ("traj_sync");
+    pTrajLoopStart = apvts.getRawParameterValue ("traj_loopStart");
+    pTrajLoopEnd   = apvts.getRawParameterValue ("traj_loopEnd");
+    pTrajLoopDir   = apvts.getRawParameterValue ("traj_loopDir");
+    pTrajInterp    = apvts.getRawParameterValue ("traj_interp");
+    pTrajTrigger   = apvts.getRawParameterValue ("traj_trigger");
+    pTrajRetrigger = apvts.getRawParameterValue ("traj_retrigger");
+    pTrajRecPoints = apvts.getRawParameterValue ("traj_recPoints");
+
     // Fail loudly in debug if any param ID was misspelt.
     jassert (pAmpAttack && pAmpDecay && pAmpSustain && pAmpRelease);
     jassert (pMasterVolume && pMasterTune);
@@ -129,6 +142,58 @@ VectronProcessor::VectronProcessor()
     jassert (pModAttack && pModDecay && pModSustain && pModRelease && pModVelAmt && pAmpVelSens);
     for (int s = 0; s < 8; ++s)
         jassert (pModSrc[s] && pModDst[s] && pModAmt[s] && pModEn[s]);
+    jassert (pTrajMode && pTrajDepth && pTrajRate && pTrajSync && pTrajLoopStart
+             && pTrajLoopEnd && pTrajLoopDir && pTrajInterp && pTrajTrigger
+             && pTrajRetrigger && pTrajRecPoints);
+
+    ensureTrajectoryState();
+    apvts.state.addListener (this);   // survives replaceState via valueTreeRedirected
+}
+
+void VectronProcessor::ensureTrajectoryState()
+{
+    if (! apvts.state.getChildWithName (vectron::traj_ids::tree).isValid())
+        apvts.state.appendChild (vectron::createDefaultTrajectory(), nullptr);
+    refreshTrajectoryModel();
+}
+
+void VectronProcessor::refreshTrajectoryModel()
+{
+    // Message thread: parse outside the lock, hold the SpinLock only for the copy.
+    const auto model = vectron::trajectoryFromState (
+        apvts.state.getChildWithName (vectron::traj_ids::tree));
+    {
+        const juce::SpinLock::ScopedLockType sl (trajLock);
+        sharedTrajModel = model;
+    }
+    trajVersion.fetch_add (1);
+}
+
+void VectronProcessor::maybeRefreshTrajectory (const juce::ValueTree& changed)
+{
+    if (changed.hasType (vectron::traj_ids::tree) || changed.hasType (vectron::traj_ids::point))
+        refreshTrajectoryModel();
+}
+
+void VectronProcessor::valueTreePropertyChanged (juce::ValueTree& t, const juce::Identifier&)
+{
+    maybeRefreshTrajectory (t);
+}
+void VectronProcessor::valueTreeChildAdded (juce::ValueTree& parent, juce::ValueTree&)
+{
+    maybeRefreshTrajectory (parent);
+}
+void VectronProcessor::valueTreeChildRemoved (juce::ValueTree& parent, juce::ValueTree&, int)
+{
+    maybeRefreshTrajectory (parent);
+}
+void VectronProcessor::valueTreeChildOrderChanged (juce::ValueTree& parent, int, int)
+{
+    maybeRefreshTrajectory (parent);
+}
+void VectronProcessor::valueTreeRedirected (juce::ValueTree&)
+{
+    ensureTrajectoryState();          // replaceState swapped the root: re-create + re-parse
 }
 
 void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -139,6 +204,7 @@ void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
             v->prepare (sampleRate, samplesPerBlock);
 
     masterGain.reset (sampleRate, 0.02);
+    masterTrajStarted = false;
 }
 
 void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -247,6 +313,57 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
             masterLfoPhase[n] += (double) buffer.getNumSamples() * (double) hz / sr;
     }
 
+    // Phase 6: trajectory — refresh audio snapshot, advance master playhead, resolve macros.
+    if (audioTrajVersion != trajVersion.load())
+    {
+        const juce::SpinLock::ScopedTryLockType tl (trajLock);   // never blocks the audio thread
+        if (tl.isLocked())
+        {
+            audioTrajModel   = sharedTrajModel;
+            audioTrajVersion = trajVersion.load();
+        }
+    }
+    vp.trajMode           = (int) pTrajMode->load();
+    vp.trajDepth          =       pTrajDepth->load();
+    vp.trajRate           =       pTrajRate->load();
+    vp.trajSync           =       pTrajSync->load() > 0.5f;
+    vp.trajSecondsPerBeat = (float) (60.0 / bpm);
+    vp.trajLoopStart      = (int) pTrajLoopStart->load();
+    vp.trajLoopEnd        = (int) pTrajLoopEnd->load();
+    vp.trajLoopDir        = (int) pTrajLoopDir->load();
+    vp.trajInterp         = (int) pTrajInterp->load();
+    vp.trajGlobal         =       pTrajTrigger->load() > 0.5f;
+    vp.trajRetrigger      =       pTrajRetrigger->load() > 0.5f;
+    vp.trajModel          = &audioTrajModel;
+
+    if (vp.trajMode == 0)
+        masterTrajStarted = false;               // re-arm so enabling restarts from P0
+    else
+    {
+        vectron::TrajectoryMacros mac;
+        mac.mode           = 2;                  // master always free-runs Loop (spec decision 10)
+        mac.rate           = vp.trajRate;
+        mac.sync           = vp.trajSync;
+        mac.secondsPerBeat = vp.trajSecondsPerBeat;
+        mac.loopStart      = vp.trajLoopStart;
+        mac.loopEnd        = vp.trajLoopEnd;
+        mac.loopDir        = vp.trajLoopDir;
+        mac.interp         = vp.trajInterp;
+        if (! masterTrajStarted)
+        {
+            masterTraj.noteOn (audioTrajModel, mac);
+            masterTrajStarted = true;
+        }
+        float mx = 0.0f, my = 0.0f;
+        masterTraj.advance (audioTrajModel, mac, 0.0f, mx, my);  // block-start position
+        vp.trajMasterState = masterTraj;
+        vp.trajMasterX     = mx;
+        vp.trajMasterY     = my;
+        if (sr > 0.0)
+            masterTraj.advance (audioTrajModel, mac,
+                                (float) (buffer.getNumSamples() / sr), mx, my);
+    }
+
     vp.modVelAmt  = pModVelAmt->load();
     vp.ampVelSens = pAmpVelSens->load();
     for (int s = 0; s < 8; ++s)
@@ -291,6 +408,7 @@ void VectronProcessor::setStateInformation (const void* data, int size)
 {
     if (auto xml = getXmlFromBinary (data, size))
         apvts.replaceState (juce::ValueTree::fromXml (*xml));
+    ensureTrajectoryState();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
