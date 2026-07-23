@@ -105,3 +105,20 @@ TEST_CASE ("levels scale a corner's contribution")
     for (int i = 0; i < 4800; ++i) maxAbs = std::max (maxAbs, std::abs (e.processSample()));
     REQUIRE (maxAbs < 1.0e-4f);          // silent when the only active corner is muted
 }
+
+TEST_CASE ("setPitchModSemis shifts one oscillator's frequency")
+{
+    VectorEngine e;
+    e.setSampleRate (48000.0);
+    e.setWave (0, PolyBlepOscillator::Wave::Sine);
+    e.setNoteFrequency (440.0f);
+    e.setVectorPosition (-1.0f, 1.0f);   // full weight on osc A
+    e.noteOn();
+
+    const int base = countRisingZeroCrossings (e, 48000);   // ~440
+    e.setPitchModSemis (0, 12.0f);
+    e.noteOn();
+    const int up = countRisingZeroCrossings (e, 48000);     // ~880
+    REQUIRE (up > base * 3 / 2);
+    REQUIRE (std::abs (up - 2 * base) <= base / 10);
+}

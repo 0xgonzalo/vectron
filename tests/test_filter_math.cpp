@@ -26,3 +26,11 @@ TEST_CASE ("result clamps to the audio range")
     REQUIRE (effectiveCutoffHz (1000.0f, 60, 0.0f, 1.0f,  1.0f) == 20000.0f);   // 32k -> clamp
     REQUIRE (effectiveCutoffHz ( 100.0f, 60, 0.0f, 1.0f, -1.0f) == 20.0f);      // 3.125 -> clamp
 }
+
+TEST_CASE ("matrix modOct adds octaves on top of keytrack + env, still clamped")
+{
+    REQUIRE_THAT (effectiveCutoffHz (1000.0f, 60, 0.0f, 0.0f, 0.0f,  1.0f), WithinRel (2000.0f, 1e-5f));
+    REQUIRE_THAT (effectiveCutoffHz (1000.0f, 60, 0.0f, 0.0f, 0.0f, -2.0f), WithinRel ( 250.0f, 1e-5f));
+    REQUIRE (effectiveCutoffHz (1000.0f, 60, 0.0f, 0.0f, 0.0f,  10.0f) == 20000.0f);
+    REQUIRE (effectiveCutoffHz (1000.0f, 60, 0.0f, 1.0f, 1.0f, -10.0f) == 20.0f);
+}

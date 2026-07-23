@@ -44,6 +44,14 @@ void VectorEngine::setDetune (int idx, int oct, int coarseSemis, float fineCents
     updateFrequency (idx);
 }
 
+void VectorEngine::setPitchModSemis (int idx, float semis) noexcept
+{
+    if (std::abs (semis - pitchMod[idx]) < 1.0e-4f)
+        return;                                    // skip the pow when unchanged
+    pitchMod[idx] = semis;
+    updateFrequency (idx);
+}
+
 void VectorEngine::setNoteFrequency (float hz) noexcept
 {
     baseHz = hz;
@@ -52,7 +60,8 @@ void VectorEngine::setNoteFrequency (float hz) noexcept
 
 void VectorEngine::updateFrequency (int idx) noexcept
 {
-    const float semis = (float) octave[idx] * 12.0f + (float) coarse[idx] + fine[idx] * 0.01f;
+    const float semis = (float) octave[idx] * 12.0f + (float) coarse[idx]
+                      + fine[idx] * 0.01f + pitchMod[idx];
     osc[idx].setFrequency (baseHz * std::pow (2.0f, semis / 12.0f));
 }
 

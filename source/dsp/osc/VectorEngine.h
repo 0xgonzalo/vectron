@@ -14,6 +14,7 @@ public:
     void setLevel (int idx, float level) noexcept;
     void setPulseWidth (int idx, float pw) noexcept;
     void setDetune (int idx, int octave, int coarseSemis, float fineCents) noexcept;
+    void setPitchModSemis (int idx, float semis) noexcept;   // additive matrix pitch mod
     void setPhaseResetEnabled (int idx, bool enabled) noexcept;
     void setXfadeMode (Xfade mode) noexcept;
     void setNoteFrequency (float baseHz) noexcept;
@@ -30,6 +31,7 @@ private:
     int   octave[kNumOsc]     { 0, 0, 0, 0 };
     int   coarse[kNumOsc]     { 0, 0, 0, 0 };
     float fine[kNumOsc]       { 0.0f, 0.0f, 0.0f, 0.0f };
+    float pitchMod[kNumOsc]   { 0.0f, 0.0f, 0.0f, 0.0f };
     bool  phaseReset[kNumOsc] { true, true, true, true };
     float baseHz   = 440.0f;
     Xfade xfade    = Xfade::Linear;
