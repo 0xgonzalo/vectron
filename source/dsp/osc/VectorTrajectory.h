@@ -124,7 +124,15 @@ private:
         segPhase = 0.0f;
         stage = Stage::Looping;
     }
-    void exitLoopForward() noexcept {}                                                  // Task 3
+    void exitLoopForward() noexcept
+    {
+        if (to < from)                                       // flip backward travel, keep position
+        {
+            const int t = to; to = from; from = t;
+            segPhase = 1.0f - segPhase;
+        }
+        stage = Stage::ReleaseTail;
+    }
 
     void arrive (const TrajectoryModel& m, const TrajectoryMacros& mac) noexcept
     {
@@ -186,8 +194,19 @@ private:
     bool  released = false;
 };
 
-inline void TrajectoryPlayhead::latchFrom (const TrajectoryPlayhead&, const TrajectoryMacros&) noexcept
+inline void TrajectoryPlayhead::latchFrom (const TrajectoryPlayhead& master,
+                                           const TrajectoryMacros& mac) noexcept
 {
-    // Task 3
+    from = master.from; to = master.to; segPhase = master.segPhase; stage = master.stage;
+    released = false;
+    if (mac.mode == 1)                                       // One-Shot: forward to Pn from here
+    {
+        if (to < from)
+        {
+            const int t = to; to = from; from = t;
+            segPhase = 1.0f - segPhase;
+        }
+        if (stage != Stage::Holding) stage = Stage::Travel;
+    }
 }
 }

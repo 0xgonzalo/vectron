@@ -258,3 +258,103 @@ TEST_CASE ("Loop mode ignores release", "[trajectory]")
     adv (ph, m, mac, 2.0f);
     REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Looping);
 }
+
+TEST_CASE ("loop+sustain exits forward to Pn on release", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 3; mac.loopStart = 1; mac.loopEnd = 2;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+
+    auto p = adv (ph, m, mac, 0.75f);                // attack 0.5 + 0.25 into P1->P2
+    REQUIRE (p.x == Approx (1.0f));
+    REQUIRE (p.y == Approx (0.0f).margin (1e-5));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Looping);
+
+    ph.release();
+    p = adv (ph, m, mac, 0.25f);                     // finishes P1->P2, now in the tail
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::ReleaseTail);
+
+    p = adv (ph, m, mac, 0.25f);                     // mid P2->P3
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (-1.0f));
+
+    p = adv (ph, m, mac, 0.25f);                     // holds at Pn
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Holding);
+}
+
+TEST_CASE ("release while traveling backward flips forward with position continuity", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 3; mac.loopStart = 0; mac.loopEnd = 3; mac.loopDir = 2;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);                              // Reverse: snapped to P3, heading to P2
+
+    auto p = adv (ph, m, mac, 0.35f);                // P3->P2 at phase 0.7
+    REQUIRE (p.x == Approx (0.4f).margin (1e-4));
+    REQUIRE (p.y == Approx (-1.0f));
+
+    ph.release();
+    p = adv (ph, m, mac, 0.0f);                      // flip is position-neutral
+    REQUIRE (p.x == Approx (0.4f).margin (1e-4));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::ReleaseTail);
+
+    p = adv (ph, m, mac, 0.35f);                     // finishes P2->P3 forward, holds at Pn
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Holding);
+}
+
+TEST_CASE ("release during the attack skips the loop and travels to Pn", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 3; mac.loopStart = 2; mac.loopEnd = 3;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    adv (ph, m, mac, 0.25f);                         // mid P0->P1, before the loop
+    ph.release();
+    auto p = adv (ph, m, mac, 1.0f);                 // passes P1, P2 without looping
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));    // mid P2->P3
+    REQUIRE (p.y == Approx (-1.0f));
+    p = adv (ph, m, mac, 0.5f);
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Holding);
+    REQUIRE (p.x == Approx (-1.0f));
+}
+
+TEST_CASE ("latchFrom copies the master state (same-mode voices track it)", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 0; mac.loopEnd = 3;
+    TrajectoryPlayhead master;
+    master.noteOn (m, mac);
+    adv (master, m, mac, 0.6f);                      // P1->P2 at phase 0.2
+
+    TrajectoryPlayhead voice;
+    voice.latchFrom (master, mac);
+    const auto pm = adv (master, m, mac, 0.2f);
+    const auto pv = adv (voice,  m, mac, 0.2f);
+    REQUIRE (pv.x == Approx (pm.x));
+    REQUIRE (pv.y == Approx (pm.y));
+}
+
+TEST_CASE ("latchFrom with One-Shot mode travels forward to Pn from the latched phase", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros loopMac; loopMac.mode = 2; loopMac.loopStart = 0; loopMac.loopEnd = 3; loopMac.loopDir = 2;
+    TrajectoryPlayhead master;
+    master.noteOn (m, loopMac);                      // Reverse: P3 heading to P2
+    adv (master, m, loopMac, 0.35f);                 // backward, phase 0.7
+
+    TrajectoryMacros oneShot; oneShot.mode = 1;
+    TrajectoryPlayhead voice;
+    voice.latchFrom (master, oneShot);
+    auto p = adv (voice, m, oneShot, 0.0f);          // same position after the flip
+    REQUIRE (p.x == Approx (0.4f).margin (1e-4));
+    p = adv (voice, m, oneShot, 0.35f);              // forward to P3 == Pn, holds
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (voice.getStage() == TrajectoryPlayhead::Stage::Holding);
+}
