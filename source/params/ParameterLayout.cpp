@@ -126,6 +126,46 @@ namespace vectron
         layout.add (std::make_unique<APF> (juce::ParameterID { "noise_sh_glide", 1 },
             "Noise S&H Glide", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
 
+        // --- Filter (PRD §5.6) ---
+        layout.add (std::make_unique<APC> (juce::ParameterID { "filter_type", 1 },
+            "Filter Type", juce::StringArray { "SVF", "Ladder" }, 0));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "filter_mode", 1 },
+            "Filter Mode", juce::StringArray { "LP", "BP", "HP", "Notch" }, 0));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "filter_slope", 1 },
+            "Filter Slope", juce::StringArray { "12 dB", "24 dB" }, 1));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filter_cutoff", 1 },
+            "Filter Cutoff", logRange (20.0f, 20000.0f), 1000.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filter_reso", 1 },
+            "Filter Resonance", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filter_drive", 1 },
+            "Filter Drive", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filter_keytrack", 1 },
+            "Filter Keytrack", juce::NormalisableRange<float> { -100.0f, 100.0f, 0.1f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filter_envAmount", 1 },
+            "Filter Env Amount", juce::NormalisableRange<float> { -1.0f, 1.0f }, 0.0f));
+
+        // --- Drive / shaper (PRD §5.5) ---
+        layout.add (std::make_unique<APC> (juce::ParameterID { "drive_type", 1 },
+            "Drive Type", juce::StringArray { "Tanh", "Hard clip", "Foldback" }, 0));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "drive_amount", 1 },
+            "Drive Amount", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "drive_trim", 1 },
+            "Drive Trim", juce::NormalisableRange<float> { -24.0f, 6.0f, 0.1f }, 0.0f));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "drive_position", 1 },
+            "Drive Position", juce::StringArray { "Pre-filter", "Post-filter" }, 0));
+
+        // --- Filter envelope (PRD §6.1) ---
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filt_attack", 1 },
+            "Filter Attack",  timeRange (10.0f), 0.005f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filt_decay", 1 },
+            "Filter Decay",   timeRange (10.0f), 0.2f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filt_sustain", 1 },
+            "Filter Sustain", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.8f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filt_release", 1 },
+            "Filter Release", timeRange (15.0f), 0.3f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "filt_velAmt", 1 },
+            "Filter Env Velocity", juce::NormalisableRange<float> { 0.0f, 1.0f }, 0.0f));
+
         return layout;
     }
 }
