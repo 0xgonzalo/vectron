@@ -100,6 +100,7 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
     filterReso.setCurrentAndTargetValue (params.filterReso);
     driveAmount.setCurrentAndTargetValue (params.driveAmount);
     driveTrimGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (params.driveTrimDb));
+    filtAdsr.reset();
     filtAdsr.noteOn();
     level = velocity;
     ampAdsr.noteOn();

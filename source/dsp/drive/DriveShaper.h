@@ -27,7 +27,10 @@ public:
             case Type::Hard:     y = std::clamp (y, -1.0f, 1.0f); break;
             case Type::Foldback: y = foldback (y);                break;
         }
-        return y * trimGain;
+        // Continuity at amount -> 0: crossfade dry->shaped over the first 4% of
+        // the range so automating drive from zero cannot step the output.
+        const float w = std::min (amount * 25.0f, 1.0f);
+        return ((1.0f - w) * x + w * y) * trimGain;
     }
 
 private:

@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include <algorithm>
 #include "SvfFilter.h"
 
 // 12/24 dB state-variable filter: one or two SvfFilters in series (identical
@@ -12,7 +13,7 @@ public:
 
     void setSampleRate (double sr) noexcept { s1.setSampleRate (sr); s2.setSampleRate (sr); }
     void setMode (Mode m)          noexcept { s1.setMode (m); s2.setMode (m); }
-    void setSlope24 (bool on)      noexcept { use24 = on; }
+    void setSlope24 (bool on)      noexcept { if (on && ! use24) s2.reset(); use24 = on; }
     void setCutoff (float hz)      noexcept { s1.setCutoff (hz); s2.setCutoff (hz); }
     void setResonance (float r)    noexcept { s1.setResonance (r); s2.setResonance (r); }
     void setDrive (float d)        noexcept { drive = std::clamp (d, 0.0f, 1.0f); }
@@ -22,7 +23,11 @@ public:
     float processSample (float x) noexcept
     {
         if (drive > 0.0f)
-            x = std::tanh ((1.0f + 3.0f * drive) * x);   // bypassed at 0: clean engine stays clean
+        {
+            const float sat = std::tanh ((1.0f + 3.0f * drive) * x);
+            const float w   = std::min (drive * 25.0f, 1.0f);
+            x = (1.0f - w) * x + w * sat;
+        }
         float y = s1.processSample (x);
         if (use24)
             y = s2.processSample (y);
