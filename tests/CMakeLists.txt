@@ -17,6 +17,7 @@ add_executable(VectronTests
     test_filter_math.cpp
     test_adsr_envelope.cpp
     test_mod_lfo.cpp
+    test_mod_matrix.cpp
     ${CMAKE_SOURCE_DIR}/source/dsp/osc/VectorEngine.cpp
     ${CMAKE_SOURCE_DIR}/source/dsp/noise/NoiseGenerator.cpp)
 target_include_directories(VectronTests PRIVATE ${CMAKE_SOURCE_DIR}/source)
