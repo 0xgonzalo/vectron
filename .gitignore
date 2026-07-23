@@ -18,3 +18,6 @@ out/
 
 # Superpowers SDD scratch (progress ledger, task briefs, review packages)
 /.superpowers/
+
+# Superpowers SDD session scratch (ledger, briefs, review packages)
+.superpowers/

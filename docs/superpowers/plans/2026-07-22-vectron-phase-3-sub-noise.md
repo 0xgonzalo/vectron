@@ -1204,10 +1204,14 @@ git commit -m "feat: wire sub oscillator and noise generator into the voice and 
 
 ## Verification (Phase 3 end-to-end)
 
-- [ ] `cmake --build build --config Debug --target VectronTests && ctest --test-dir build -C Debug --output-on-failure` — all oscillator, vector, SVF, sub, and noise tests pass.
-- [ ] Plugin builds Standalone + VST3 bundle with no new warnings. (VST3 post-build system-dir copy needs admin — the `.vst3` bundle itself building is sufficient; see build-env memory.)
-- [ ] Manual host check (Task 7 Step 8): noise color sweep + tuned mode audibly work; sub adds weight.
-- [ ] `pluginval --strictness-level 10 --validate-in-process --skip-gui-tests build/Vectron_artefacts/Debug/VST3/Vectron.vst3` passes (pluginval in scratchpad; see build-env memory).
+- [x] `cmake --build build --config Debug --target VectronTests && ctest --test-dir build -C Debug --output-on-failure` — all oscillator, vector, SVF, sub, and noise tests pass. **✅ 34/34 pass (2026-07-22).**
+- [x] Plugin builds Standalone + VST3 bundle with no new warnings. **✅ Standalone + VST3 bundle build clean; no warnings on NoiseGenerator/VectronVoice/PluginProcessor under strict flags. (VST3 post-build system-dir copy needs admin — the `.vst3` bundle itself builds.)**
+- [ ] Manual host check (Task 7 Step 8): noise color sweep + tuned mode audibly work; sub adds weight. **⏳ PENDING USER — launch `build/Vectron_artefacts/Debug/Standalone/Vectron.exe`.**
+- [x] `pluginval --strictness-level 10 --validate-in-process --skip-gui-tests build/Vectron_artefacts/Debug/VST3/Vectron.vst3` passes. **✅ SUCCESS strictness 10 (2026-07-22), re-run after the smoothing fix.**
+
+## Outcome
+
+Executed via subagent-driven development on branch `phase-3-sub-noise` (merged to `main`, fast-forward). 7 tasks + 1 fix pass, each task-reviewed; final whole-branch review (opus) → "with fixes"; the one Important finding (smooth noise level/cutoff) plus all Minor polish were applied in commit `f368015` and re-reviewed clean. Commits `d2be08a`..`f368015`. Only open item: the manual audio listening check.
 
 ## Notes / Decisions Locked (Phase 3)
 
