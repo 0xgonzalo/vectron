@@ -104,14 +104,37 @@ private:
         return sec > 0.001f ? sec : 0.001f;                  // 1 ms floor (spec decision 12)
     }
 
-    void maybeEnterLoop (const TrajectoryModel&, const TrajectoryMacros&) noexcept {}   // Task 2
+    // Called when sitting exactly on a point (segPhase == 0, from == current point).
+    void maybeEnterLoop (const TrajectoryModel& m, const TrajectoryMacros& mac) noexcept
+    {
+        if (mac.mode != 2 && mac.mode != 3) return;
+        if (mac.mode == 3 && released) return;               // released: behave one-shot (Task 3)
+        const int last = m.numPoints - 1;
+        const int ls = clampIdx (mac.loopStart, last);
+        const int le = clampIdx (mac.loopEnd,   last);
+        if (from < ls) return;                               // attack still traveling to the loop
+        if (ls >= le)
+        {
+            stage = Stage::Holding;
+            from = to = ls; segPhase = 0.0f;
+            return;
+        }
+        if (mac.loopDir == 2) { from = le; to = le - 1; }    // Reverse: snap to loopEnd
+        else                  { from = ls; to = ls + 1; }    // Forward / Ping-Pong
+        segPhase = 0.0f;
+        stage = Stage::Looping;
+    }
     void exitLoopForward() noexcept {}                                                  // Task 3
 
     void arrive (const TrajectoryModel& m, const TrajectoryMacros& mac) noexcept
     {
         const int last = m.numPoints - 1;
+        const int ls = clampIdx (mac.loopStart, last);
+        const int le = clampIdx (mac.loopEnd,   last);
+        const int travelDir = (to >= from) ? 1 : -1;
         const int at = to;
         from = at; segPhase = 0.0f;
+
         if (stage == Stage::Travel)
         {
             maybeEnterLoop (m, mac);
@@ -120,8 +143,30 @@ private:
             to = at + 1;
             return;
         }
-        stage = Stage::Holding;                              // Looping/ReleaseTail: Tasks 2-3
-        to = at;
+        if (stage == Stage::ReleaseTail)                     // Task 3
+        {
+            if (at >= last) { stage = Stage::Holding; to = at; return; }
+            to = at + 1;
+            return;
+        }
+        // Looping
+        if (ls >= le) { stage = Stage::Holding; from = to = ls; return; }
+        switch (mac.loopDir)
+        {
+            case 2:                                          // Reverse (traveling backward)
+                if (at <= ls) { from = le; to = le - 1; }    // snap back to loopEnd
+                else          to = at - 1;
+                break;
+            case 1:                                          // Ping-Pong
+                if      (at >= le) to = at - 1;
+                else if (at <= ls) to = at + 1;
+                else               to = at + travelDir;
+                break;
+            default:                                         // Forward
+                if (at >= le) { from = ls; to = ls + 1; }    // snap to loopStart
+                else          to = at + 1;
+                break;
+        }
     }
 
     void outputPosition (const TrajectoryModel& m, const TrajectoryMacros& mac,

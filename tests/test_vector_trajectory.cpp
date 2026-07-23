@@ -148,3 +148,113 @@ TEST_CASE ("mode Off never advances", "[trajectory]")
     REQUIRE (p.x == Approx (-1.0f));
     REQUIRE (p.y == Approx (1.0f));
 }
+
+TEST_CASE ("loop entry at loopStart == 0 starts looping immediately", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 0; mac.loopEnd = 3;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Looping);
+}
+
+TEST_CASE ("forward loop wraps from loopEnd to loopStart", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 1; mac.loopEnd = 3;  // loopDir Forward
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+
+    auto p = adv (ph, m, mac, 0.5f);                 // attack P0->P1 done: at loop entry
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Looping);
+    REQUIRE (p.x == Approx (1.0f));
+    REQUIRE (p.y == Approx (1.0f));
+
+    p = adv (ph, m, mac, 1.75f);                     // 1 full loop cycle (1.0 s) + 0.75 s
+    // 0.75 s into the region: P1->P2 (0.5) then mid P2->P3
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (-1.0f));
+
+    p = adv (ph, m, mac, 0.25f);                     // reach P3 == loopEnd -> wrap to P1
+    REQUIRE (p.x == Approx (1.0f));
+    REQUIRE (p.y == Approx (1.0f));
+}
+
+TEST_CASE ("reverse loop snaps to loopEnd and travels backward", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 0; mac.loopEnd = 3; mac.loopDir = 2;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+
+    auto p = adv (ph, m, mac, 0.0f);                 // entry snapped to P3
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+
+    p = adv (ph, m, mac, 0.25f);                     // mid P3->P2
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (-1.0f));
+
+    p = adv (ph, m, mac, 1.0f);                      // 1.25 s backward: mid P1->P0
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (1.0f));
+
+    p = adv (ph, m, mac, 0.25f);                     // reach P0 == loopStart -> snap to P3
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+}
+
+TEST_CASE ("ping-pong bounces at both loop ends", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 0; mac.loopEnd = 3; mac.loopDir = 1;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+
+    auto p = adv (ph, m, mac, 1.75f);                // forward to P3 (1.5 s) + 0.25 s back
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));    // mid P3->P2
+    REQUIRE (p.y == Approx (-1.0f));
+
+    p = adv (ph, m, mac, 1.25f);                     // full backward leg ends at P0
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (1.0f));
+
+    p = adv (ph, m, mac, 0.25f);                     // bounced forward: mid P0->P1
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (1.0f));
+}
+
+TEST_CASE ("loopStart >= loopEnd holds at loopStart", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 2; mac.loopEnd = 2;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 5.0f);           // attack P0->P1->P2, then hold
+    REQUIRE (p.x == Approx (1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Holding);
+}
+
+TEST_CASE ("loop indices clamp to the model size", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 10; mac.loopEnd = 15;   // both clamp to 3
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 5.0f);
+    REQUIRE (p.x == Approx (-1.0f));
+    REQUIRE (p.y == Approx (-1.0f));
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Holding);
+}
+
+TEST_CASE ("Loop mode ignores release", "[trajectory]")
+{
+    const auto m = cornersModel();
+    TrajectoryMacros mac; mac.mode = 2; mac.loopStart = 0; mac.loopEnd = 3;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    ph.release();
+    adv (ph, m, mac, 2.0f);
+    REQUIRE (ph.getStage() == TrajectoryPlayhead::Stage::Looping);
+}
