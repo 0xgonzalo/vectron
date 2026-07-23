@@ -427,3 +427,16 @@ TEST_CASE ("bowed output clamps to the XY range", "[trajectory]")
     const auto p = adv (ph, m, mac, 0.25f);          // apex would be y = 1.25
     REQUIRE (p.y == Approx (1.0f));                  // clamped
 }
+
+TEST_CASE ("tension bow is invariant to traversal direction", "[trajectory]")
+{
+    auto m = straightLineModel();
+    m.points[1].tension = 1.0f;
+    TrajectoryMacros mac; mac.mode = 2; mac.interp = 1;
+    mac.loopStart = 0; mac.loopEnd = 1; mac.loopDir = 2;   // Reverse: travels P1 -> P0
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 0.25f);                // phase 0.5, eased t = 0.5
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (0.5f).margin (1e-4));          // same bow side as forward travel
+}

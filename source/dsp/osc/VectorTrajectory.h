@@ -191,14 +191,18 @@ private:
         {
             // Quadratic Bézier bow: control point sits tension * 0.5 * chordLen along the
             // unit perpendicular from the chord midpoint (0 = straight, spec decision 9).
-            const float tension = m.points[from > to ? from : to].tension;
-            const float dx = b.x - a.x, dy = b.y - a.y;
+            // Chord taken in point-index order so the path shape is invariant to traversal
+            // direction — Reverse/Ping-Pong must not mirror the curve.
+            const auto& lo = m.points[from < to ? from : to];
+            const auto& hi = m.points[from > to ? from : to];
+            const float tension = hi.tension;
+            const float dx = hi.x - lo.x, dy = hi.y - lo.y;
             const float len = std::sqrt (dx * dx + dy * dy);
             if (tension != 0.0f && len > 1.0e-6f)
             {
                 const float px = -dy / len, py = dx / len;
-                const float cx = 0.5f * (a.x + b.x) + tension * 0.5f * len * px;
-                const float cy = 0.5f * (a.y + b.y) + tension * 0.5f * len * py;
+                const float cx = 0.5f * (lo.x + hi.x) + tension * 0.5f * len * px;
+                const float cy = 0.5f * (lo.y + hi.y) + tension * 0.5f * len * py;
                 const float u  = 1.0f - t;
                 x = u * u * a.x + 2.0f * u * t * cx + t * t * b.x;
                 y = u * u * a.y + 2.0f * u * t * cy + t * t * b.y;
