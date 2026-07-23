@@ -4,6 +4,8 @@
 #include "osc/VectorLfo.h"
 #include "osc/SubOscillator.h"
 #include "noise/NoiseGenerator.h"
+#include "filter/FilterStage.h"
+#include "drive/DriveShaper.h"
 
 struct VectronVoiceParams
 {
@@ -38,6 +40,21 @@ struct VectronVoiceParams
     float noiseLevel      { 0.0f };
     float noiseShRate     { 5.0f };
     float noiseShGlide    { 0.0f };
+
+    // Filter + drive (Phase 4)
+    int   filterType      { 0 };       // 0 SVF, 1 Ladder
+    int   filterMode      { 0 };       // 0 LP, 1 BP, 2 HP, 3 Notch
+    int   filterSlope     { 1 };       // 0 -> 12 dB, 1 -> 24 dB
+    float filterCutoff    { 1000.0f };
+    float filterReso      { 0.0f };
+    float filterDrive     { 0.0f };
+    float filterKeytrack  { 0.0f };    // -100 .. +100 %
+    float filterEnvAmount { 0.0f };    // -1 .. +1
+    int   driveType       { 0 };       // 0 Tanh, 1 Hard, 2 Foldback
+    float driveAmount     { 0.0f };
+    float driveTrimDb     { 0.0f };
+    int   drivePosition   { 0 };       // 0 Pre-filter, 1 Post-filter
+    float filtVelAmt      { 0.0f };
 };
 
 class VectronVoice : public juce::SynthesiserVoice
@@ -45,6 +62,7 @@ class VectronVoice : public juce::SynthesiserVoice
 public:
     void prepare (double sampleRate, int blockSize);
     void setAmpAdsr (const juce::ADSR::Parameters& p) { ampAdsr.setParameters (p); }
+    void setFiltAdsr (const juce::ADSR::Parameters& p) { filtAdsr.setParameters (p); }
     void setMasterTune (float a4Hz) { masterTuneHz = a4Hz; }
     void setVectorParams (const VectronVoiceParams& p) noexcept { params = p; applyParams(); }
 
@@ -66,6 +84,11 @@ private:
     SubOscillator subOsc;
     NoiseGenerator noiseGen;
     juce::SmoothedValue<float> subLevel;
+    FilterStage filterStage;
+    DriveShaper driveShaper;
+    juce::ADSR  filtAdsr;
+    juce::SmoothedValue<float> filterCutoffHz, filterReso, driveAmount, driveTrimGain;
+    int currentNote = 60;
     juce::ADSR   ampAdsr;
     VectronVoiceParams params;
     float level = 0.0f;

@@ -60,6 +60,24 @@ VectronProcessor::VectronProcessor()
     pNoiseShRate     = apvts.getRawParameterValue ("noise_sh_rate");
     pNoiseShGlide    = apvts.getRawParameterValue ("noise_sh_glide");
 
+    pFilterType      = apvts.getRawParameterValue ("filter_type");
+    pFilterMode      = apvts.getRawParameterValue ("filter_mode");
+    pFilterSlope     = apvts.getRawParameterValue ("filter_slope");
+    pFilterCutoff    = apvts.getRawParameterValue ("filter_cutoff");
+    pFilterReso      = apvts.getRawParameterValue ("filter_reso");
+    pFilterDrive     = apvts.getRawParameterValue ("filter_drive");
+    pFilterKeytrack  = apvts.getRawParameterValue ("filter_keytrack");
+    pFilterEnvAmount = apvts.getRawParameterValue ("filter_envAmount");
+    pDriveType       = apvts.getRawParameterValue ("drive_type");
+    pDriveAmount     = apvts.getRawParameterValue ("drive_amount");
+    pDriveTrim       = apvts.getRawParameterValue ("drive_trim");
+    pDrivePosition   = apvts.getRawParameterValue ("drive_position");
+    pFiltAttack      = apvts.getRawParameterValue ("filt_attack");
+    pFiltDecay       = apvts.getRawParameterValue ("filt_decay");
+    pFiltSustain     = apvts.getRawParameterValue ("filt_sustain");
+    pFiltRelease     = apvts.getRawParameterValue ("filt_release");
+    pFiltVelAmt      = apvts.getRawParameterValue ("filt_velAmt");
+
     // Fail loudly in debug if any param ID was misspelt.
     jassert (pAmpAttack && pAmpDecay && pAmpSustain && pAmpRelease);
     jassert (pMasterVolume && pMasterTune);
@@ -72,6 +90,10 @@ VectronProcessor::VectronProcessor()
     jassert (pSubWave && pSubOct && pSubLevel);
     jassert (pNoiseColor && pNoiseTuned && pNoisePitch && pNoiseKeytrack && pNoiseFilterType
              && pNoiseCutoff && pNoiseReso && pNoiseLevel && pNoiseShRate && pNoiseShGlide);
+    jassert (pFilterType && pFilterMode && pFilterSlope && pFilterCutoff && pFilterReso
+             && pFilterDrive && pFilterKeytrack && pFilterEnvAmount);
+    jassert (pDriveType && pDriveAmount && pDriveTrim && pDrivePosition);
+    jassert (pFiltAttack && pFiltDecay && pFiltSustain && pFiltRelease && pFiltVelAmt);
 }
 
 void VectronProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
@@ -136,10 +158,31 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     vp.noiseShRate     =        pNoiseShRate->load();
     vp.noiseShGlide    =        pNoiseShGlide->load();
 
+    vp.filterType      = (int) pFilterType->load();
+    vp.filterMode      = (int) pFilterMode->load();
+    vp.filterSlope     = (int) pFilterSlope->load();
+    vp.filterCutoff    =       pFilterCutoff->load();
+    vp.filterReso      =       pFilterReso->load();
+    vp.filterDrive     =       pFilterDrive->load();
+    vp.filterKeytrack  =       pFilterKeytrack->load();
+    vp.filterEnvAmount =       pFilterEnvAmount->load();
+    vp.driveType       = (int) pDriveType->load();
+    vp.driveAmount     =       pDriveAmount->load();
+    vp.driveTrimDb     =       pDriveTrim->load();
+    vp.drivePosition   = (int) pDrivePosition->load();
+    vp.filtVelAmt      =       pFiltVelAmt->load();
+
+    const juce::ADSR::Parameters filtParams {
+        pFiltAttack->load(),
+        pFiltDecay->load(),
+        pFiltSustain->load(),
+        pFiltRelease->load() };
+
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto* v = dynamic_cast<VectronVoice*> (synth.getVoice (i)))
         {
             v->setAmpAdsr (ampParams);
+            v->setFiltAdsr (filtParams);
             v->setMasterTune (tuneHz);
             v->setVectorParams (vp);
         }

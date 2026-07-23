@@ -1,5 +1,6 @@
 #include "VectronVoice.h"
 #include "VectronSound.h"
+#include "filter/FilterMath.h"
 
 void VectronVoice::prepare (double sampleRate, int /*blockSize*/)
 {
@@ -13,6 +14,12 @@ void VectronVoice::prepare (double sampleRate, int /*blockSize*/)
     subOsc.setSampleRate (sampleRate);
     noiseGen.setSampleRate (sampleRate);
     subLevel.reset (sampleRate, 0.01);
+    filterStage.prepare (sampleRate);
+    filtAdsr.setSampleRate (sampleRate);
+    filterCutoffHz.reset (sampleRate, 0.02);
+    filterReso.reset (sampleRate, 0.01);
+    driveAmount.reset (sampleRate, 0.01);
+    driveTrimGain.reset (sampleRate, 0.01);
     applyParams();
 }
 
@@ -52,6 +59,17 @@ void VectronVoice::applyParams() noexcept
     noiseGen.setLevel (params.noiseLevel);
     noiseGen.setShRate (params.noiseShRate);
     noiseGen.setShGlide (params.noiseShGlide);
+
+    filterStage.setEngine (static_cast<FilterStage::Engine> (params.filterType));
+    filterStage.setMode (static_cast<FilterStage::Mode> (params.filterMode));
+    filterStage.setSlope24 (params.filterSlope == 1);
+    filterStage.setDrive (params.filterDrive);
+    filterCutoffHz.setTargetValue (params.filterCutoff);
+    filterReso.setTargetValue (params.filterReso);
+
+    driveShaper.setType (static_cast<DriveShaper::Type> (params.driveType));
+    driveAmount.setTargetValue (params.driveAmount);
+    driveTrimGain.setTargetValue (juce::Decibels::decibelsToGain (params.driveTrimDb));
 }
 
 bool VectronVoice::canPlaySound (juce::SynthesiserSound* sound)
@@ -76,6 +94,13 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
     baseY.setCurrentAndTargetValue (params.baseY);
     vectorLevel.setCurrentAndTargetValue (params.vectorLevel);
     subLevel.setCurrentAndTargetValue (params.subLevel);
+    currentNote = midiNoteNumber;
+    filterStage.reset();
+    filterCutoffHz.setCurrentAndTargetValue (params.filterCutoff);
+    filterReso.setCurrentAndTargetValue (params.filterReso);
+    driveAmount.setCurrentAndTargetValue (params.driveAmount);
+    driveTrimGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (params.driveTrimDb));
+    filtAdsr.noteOn();
     level = velocity;
     ampAdsr.noteOn();
 }
@@ -85,10 +110,12 @@ void VectronVoice::stopNote (float, bool allowTailOff)
     if (allowTailOff)
     {
         ampAdsr.noteOff();
+        filtAdsr.noteOff();
     }
     else
     {
         ampAdsr.reset();
+        filtAdsr.reset();
         clearCurrentNote();
     }
 }
@@ -110,8 +137,25 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
         const float sub   = subOsc.processSample() * subLevel.getNextValue();
         const float noise = noiseGen.processSample();
 
+        // Filter cutoff modulation: keytrack + Filter ADSR scaled by velocity.
+        const float fEnv     = filtAdsr.getNextSample()
+                             * (1.0f - params.filtVelAmt + params.filtVelAmt * level);
+        filterStage.setResonance (filterReso.getNextValue());
+        filterStage.setCutoff (vectron::effectiveCutoffHz (filterCutoffHz.getNextValue(),
+                                                           currentNote,
+                                                           params.filterKeytrack,
+                                                           fEnv,
+                                                           params.filterEnvAmount));
+        driveShaper.setAmount (driveAmount.getNextValue());
+        driveShaper.setTrimGain (driveTrimGain.getNextValue());
+
+        float s = vec + sub + noise;
+        if (params.drivePosition == 0) s = driveShaper.processSample (s);
+        s = filterStage.processSample (s);
+        if (params.drivePosition == 1) s = driveShaper.processSample (s);
+
         const float env = ampAdsr.getNextSample();
-        const float s   = (vec + sub + noise) * env * level * 0.3f;
+        s *= env * level * 0.3f;
 
         for (int ch = 0; ch < output.getNumChannels(); ++ch)
             output.addSample (ch, startSample + i, s);

@@ -82,5 +82,24 @@ private:
     std::atomic<float>* pNoiseShRate     { nullptr };
     std::atomic<float>* pNoiseShGlide    { nullptr };
 
+    // Filter + drive + filter env
+    std::atomic<float>* pFilterType      { nullptr };
+    std::atomic<float>* pFilterMode      { nullptr };
+    std::atomic<float>* pFilterSlope     { nullptr };
+    std::atomic<float>* pFilterCutoff    { nullptr };
+    std::atomic<float>* pFilterReso      { nullptr };
+    std::atomic<float>* pFilterDrive     { nullptr };
+    std::atomic<float>* pFilterKeytrack  { nullptr };
+    std::atomic<float>* pFilterEnvAmount { nullptr };
+    std::atomic<float>* pDriveType       { nullptr };
+    std::atomic<float>* pDriveAmount     { nullptr };
+    std::atomic<float>* pDriveTrim       { nullptr };
+    std::atomic<float>* pDrivePosition   { nullptr };
+    std::atomic<float>* pFiltAttack      { nullptr };
+    std::atomic<float>* pFiltDecay       { nullptr };
+    std::atomic<float>* pFiltSustain     { nullptr };
+    std::atomic<float>* pFiltRelease     { nullptr };
+    std::atomic<float>* pFiltVelAmt      { nullptr };
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VectronProcessor)
 };
