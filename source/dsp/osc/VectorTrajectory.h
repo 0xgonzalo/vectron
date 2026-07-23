@@ -180,12 +180,32 @@ private:
     void outputPosition (const TrajectoryModel& m, const TrajectoryMacros& mac,
                          float& ox, float& oy) const noexcept
     {
-        (void) mac;                                          // Smooth interp lands in Task 4
         const auto& a = m.points[from];
         const auto& b = m.points[to];
-        const float t = segPhase;
-        ox = clamp1 (a.x + (b.x - a.x) * t);
-        oy = clamp1 (a.y + (b.y - a.y) * t);
+        float t = segPhase;
+        if (mac.interp == 1)
+            t = 0.5f - 0.5f * std::cos (t * 3.14159265358979f);   // cosine ease
+        float x = a.x + (b.x - a.x) * t;
+        float y = a.y + (b.y - a.y) * t;
+        if (mac.interp == 1)
+        {
+            // Quadratic Bézier bow: control point sits tension * 0.5 * chordLen along the
+            // unit perpendicular from the chord midpoint (0 = straight, spec decision 9).
+            const float tension = m.points[from > to ? from : to].tension;
+            const float dx = b.x - a.x, dy = b.y - a.y;
+            const float len = std::sqrt (dx * dx + dy * dy);
+            if (tension != 0.0f && len > 1.0e-6f)
+            {
+                const float px = -dy / len, py = dx / len;
+                const float cx = 0.5f * (a.x + b.x) + tension * 0.5f * len * px;
+                const float cy = 0.5f * (a.y + b.y) + tension * 0.5f * len * py;
+                const float u  = 1.0f - t;
+                x = u * u * a.x + 2.0f * u * t * cx + t * t * b.x;
+                y = u * u * a.y + 2.0f * u * t * cy + t * t * b.y;
+            }
+        }
+        ox = clamp1 (x);
+        oy = clamp1 (y);
     }
 
     int   from = 0, to = 0;

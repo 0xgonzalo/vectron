@@ -358,3 +358,72 @@ TEST_CASE ("latchFrom with One-Shot mode travels forward to Pn from the latched 
     REQUIRE (p.y == Approx (-1.0f));
     REQUIRE (voice.getStage() == TrajectoryPlayhead::Stage::Holding);
 }
+
+namespace
+{
+    TrajectoryModel straightLineModel()              // P0(-1,0) -> P1(+1,0), 500 ms
+    {
+        TrajectoryModel m;
+        m.numPoints = 2;
+        m.points[0].x = -1.0f; m.points[0].y = 0.0f;
+        m.points[1].x =  1.0f; m.points[1].y = 0.0f;
+        m.points[1].timeMs = 500.0f;
+        return m;
+    }
+}
+
+TEST_CASE ("smooth interp eases timing with a cosine", "[trajectory]")
+{
+    const auto m = straightLineModel();
+    TrajectoryMacros mac; mac.mode = 1; mac.interp = 1;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 0.125f);         // segPhase 0.25 -> eased t = 0.14645
+    REQUIRE (p.x == Approx (-1.0f + 2.0f * 0.146447f).margin (1e-4));
+    REQUIRE (p.y == Approx (0.0f).margin (1e-6));
+}
+
+TEST_CASE ("tension bows the segment perpendicular to the chord", "[trajectory]")
+{
+    auto m = straightLineModel();
+    m.points[1].tension = 1.0f;
+    TrajectoryMacros mac; mac.mode = 1; mac.interp = 1;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 0.25f);          // segPhase 0.5 -> eased t = 0.5
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (0.5f).margin (1e-4));    // ctrl (0, +1) -> apex y = 0.5
+
+    m.points[1].tension = -1.0f;
+    TrajectoryPlayhead ph2;
+    ph2.noteOn (m, mac);
+    const auto q = adv (ph2, m, mac, 0.25f);
+    REQUIRE (q.y == Approx (-0.5f).margin (1e-4));   // opposite bow
+}
+
+TEST_CASE ("linear interp ignores tension", "[trajectory]")
+{
+    auto m = straightLineModel();
+    m.points[1].tension = 1.0f;
+    TrajectoryMacros mac; mac.mode = 1; mac.interp = 0;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 0.25f);
+    REQUIRE (p.x == Approx (0.0f).margin (1e-5));
+    REQUIRE (p.y == Approx (0.0f));
+}
+
+TEST_CASE ("bowed output clamps to the XY range", "[trajectory]")
+{
+    TrajectoryModel m;
+    m.numPoints = 2;
+    m.points[0].x = 0.0f; m.points[0].y = 1.0f;      // chord along the top edge
+    m.points[1].x = 1.0f; m.points[1].y = 1.0f;
+    m.points[1].timeMs = 500.0f;
+    m.points[1].tension = 1.0f;                      // bows above y = +1
+    TrajectoryMacros mac; mac.mode = 1; mac.interp = 1;
+    TrajectoryPlayhead ph;
+    ph.noteOn (m, mac);
+    const auto p = adv (ph, m, mac, 0.25f);          // apex would be y = 1.25
+    REQUIRE (p.y == Approx (1.0f));                  // clamped
+}
