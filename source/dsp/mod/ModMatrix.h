@@ -23,6 +23,7 @@ struct ModMatrix
         DstSubLevel, DstNoiseLevel, DstNoiseColor, DstNoiseCutoff,
         DstFilterCutoff, DstFilterReso, DstDriveAmount, DstAmpLevel,
         DstLfo1Rate, DstLfo2Rate, DstPan,
+        DstTrajDepth,                       // Phase 6: appended last so preset indices hold
         kNumDests
     };
 

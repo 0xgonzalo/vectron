@@ -224,7 +224,8 @@ namespace vectron
                                                 "Osc A Level", "Osc B Level", "Osc C Level", "Osc D Level",
                                                 "Sub Level", "Noise Level", "Noise Color", "Noise Cutoff",
                                                 "Filter Cutoff", "Filter Reso", "Drive Amount", "Amp Level",
-                                                "LFO1 Rate", "LFO2 Rate", "Pan" };
+                                                "LFO1 Rate", "LFO2 Rate", "Pan",
+                                                "Traj Depth" };
         static_assert (std::size (srcNames) == (size_t) ModMatrix::kNumSources);
         static_assert (std::size (dstNames) == (size_t) ModMatrix::kNumDests);
 
@@ -244,6 +245,32 @@ namespace vectron
             layout.add (std::make_unique<APB> (juce::ParameterID { id + "_en", 1 },
                 name + " Enable", false));
         }
+
+        // --- Phase 6: vector trajectory macro-controls (PRD §5.2.1) ---
+        // Point data is NOT parameterised — it lives in the "TRAJECTORY" ValueTree
+        // child of the APVTS state (spec decision 2).
+        layout.add (std::make_unique<APC> (juce::ParameterID { "traj_mode", 1 },
+            "Traj Mode", juce::StringArray { "Off", "One-Shot", "Loop", "Loop+Sustain" }, 0));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "traj_depth", 1 },
+            "Traj Depth", juce::NormalisableRange<float> { 0.0f, 1.0f }, 1.0f));
+        layout.add (std::make_unique<APF> (juce::ParameterID { "traj_rate", 1 },
+            "Traj Rate", logRange (0.25f, 4.0f), 1.0f));
+        layout.add (std::make_unique<APB> (juce::ParameterID { "traj_sync", 1 },
+            "Traj Sync", false));
+        layout.add (std::make_unique<API> (juce::ParameterID { "traj_loopStart", 1 },
+            "Traj Loop Start", 0, 15, 0));
+        layout.add (std::make_unique<API> (juce::ParameterID { "traj_loopEnd", 1 },
+            "Traj Loop End", 0, 15, 3));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "traj_loopDir", 1 },
+            "Traj Loop Dir", juce::StringArray { "Forward", "Ping-Pong", "Reverse" }, 0));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "traj_interp", 1 },
+            "Traj Interp", juce::StringArray { "Linear", "Smooth" }, 0));
+        layout.add (std::make_unique<APC> (juce::ParameterID { "traj_trigger", 1 },
+            "Traj Trigger", juce::StringArray { "Per-Note", "Global" }, 0));
+        layout.add (std::make_unique<APB> (juce::ParameterID { "traj_retrigger", 1 },
+            "Traj Retrigger", true));
+        layout.add (std::make_unique<API> (juce::ParameterID { "traj_recPoints", 1 },
+            "Traj Rec Points", 4, 16, 8));   // dormant until the GUI recording phase
 
         return layout;
     }

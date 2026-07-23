@@ -11,8 +11,9 @@ namespace
 TEST_CASE ("enum sizes match the PRD contract")
 {
     STATIC_REQUIRE (MM::kNumSources == 11);
-    STATIC_REQUIRE (MM::kNumDests  == 25);
+    STATIC_REQUIRE (MM::kNumDests  == 26);          // PRD §6.3's 25 + Traj Depth (Phase 6 spec)
     STATIC_REQUIRE (MM::kNumSlots  == 8);
+    STATIC_REQUIRE (MM::DstTrajDepth == 25);        // appended last: existing preset indices hold
 }
 
 TEST_CASE ("disabled slots contribute nothing")
