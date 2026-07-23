@@ -28,3 +28,27 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)
 catch_discover_tests(VectronTests)
+
+# Offline acceptance smoke: renders the real processor and checks mod routings
+# audibly change the output (PRD §12.5). Own JUCE compile — not Catch2-based.
+juce_add_console_app(VectronSmoke PRODUCT_NAME "VectronSmoke")
+target_sources(VectronSmoke PRIVATE
+    smoke_main.cpp
+    ${CMAKE_SOURCE_DIR}/source/PluginProcessor.cpp
+    ${CMAKE_SOURCE_DIR}/source/params/ParameterLayout.cpp
+    ${CMAKE_SOURCE_DIR}/source/dsp/VectronVoice.cpp
+    ${CMAKE_SOURCE_DIR}/source/dsp/osc/VectorEngine.cpp
+    ${CMAKE_SOURCE_DIR}/source/dsp/noise/NoiseGenerator.cpp
+    ${CMAKE_SOURCE_DIR}/source/dsp/filter/FilterStage.cpp)
+target_include_directories(VectronSmoke PRIVATE ${CMAKE_SOURCE_DIR}/source)
+target_compile_features(VectronSmoke PRIVATE cxx_std_20)
+target_compile_definitions(VectronSmoke PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_MODAL_LOOPS_PERMITTED=0
+    JUCE_STANDALONE_APPLICATION=1)
+target_link_libraries(VectronSmoke PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_recommended_config_flags)
+add_test(NAME VectronSmoke COMMAND VectronSmoke)
