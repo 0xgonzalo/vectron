@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "osc/VectorEngine.h"
+#include "osc/VectorTrajectory.h"
 #include "osc/VectorLfo.h"
 #include "osc/SubOscillator.h"
 #include "noise/NoiseGenerator.h"
@@ -74,6 +75,22 @@ struct VectronVoiceParams
 
     // Phase 5: matrix slots
     vectron::ModMatrix::Slot slots[vectron::ModMatrix::kNumSlots];
+
+    // Phase 6: vector trajectory (macros; points come via the trajModel snapshot pointer)
+    int   trajMode           { 0 };      // 0 Off, 1 One-Shot, 2 Loop, 3 Loop+Sustain
+    float trajDepth          { 1.0f };
+    float trajRate           { 1.0f };
+    bool  trajSync           { false };
+    float trajSecondsPerBeat { 0.5f };   // 60/bpm, processor-resolved (voice never sees BPM)
+    int   trajLoopStart      { 0 };
+    int   trajLoopEnd        { 3 };
+    int   trajLoopDir        { 0 };
+    int   trajInterp         { 0 };
+    bool  trajGlobal         { false };  // traj_trigger == Global
+    bool  trajRetrigger      { true };
+    const vectron::TrajectoryModel* trajModel { nullptr };   // processor-owned, block-stable
+    vectron::TrajectoryPlayhead trajMasterState;             // master playhead at block start
+    float trajMasterX { 0.0f }, trajMasterY { 0.0f };        // master position at block start
 };
 
 class VectronVoice : public juce::SynthesiserVoice
@@ -104,6 +121,7 @@ public:
 
 private:
     void applyParams() noexcept;
+    vectron::TrajectoryMacros trajMacros() const noexcept;
 
     VectorEngine engine;
     VectorLfo    lfo[2];                 // [0]=X, [1]=Y
@@ -128,6 +146,9 @@ private:
     float  prevLfoRateMod[2] { 0.0f, 0.0f };         // 1-sample feedback for LFO-rate dests
     float  appliedRateMod[2] { 0.0f, 0.0f };         // last rate mod pushed into the LFO
     VectronVoiceParams params;
+    vectron::TrajectoryPlayhead trajPlayhead;
+    juce::SmoothedValue<float> trajX, trajY;     // block-rate playhead, smoothed per sample
+    double voiceSampleRate = 48000.0;
     float level = 0.0f;
     float masterTuneHz = 440.0f;
 };

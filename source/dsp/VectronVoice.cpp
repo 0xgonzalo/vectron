@@ -27,6 +27,9 @@ void VectronVoice::prepare (double sampleRate, int /*blockSize*/)
     modLfo[1].setSeed (2u);                          // same seeds in every voice: Global mode lines up
     modAdsr.setSampleRate (sampleRate);
     ccSmoothCoef = 1.0f - std::exp (-1.0f / (0.005f * (float) sampleRate));   // ~5 ms
+    voiceSampleRate = sampleRate;
+    trajX.reset (sampleRate, 0.02);
+    trajY.reset (sampleRate, 0.02);
     applyParams();
 }
 
@@ -89,6 +92,20 @@ void VectronVoice::applyParams() noexcept
     }
 }
 
+vectron::TrajectoryMacros VectronVoice::trajMacros() const noexcept
+{
+    vectron::TrajectoryMacros m;
+    m.mode           = params.trajMode;
+    m.rate           = params.trajRate;
+    m.sync           = params.trajSync;
+    m.secondsPerBeat = params.trajSecondsPerBeat;
+    m.loopStart      = params.trajLoopStart;
+    m.loopEnd        = params.trajLoopEnd;
+    m.loopDir        = params.trajLoopDir;
+    m.interp         = params.trajInterp;
+    return m;
+}
+
 bool VectronVoice::canPlaySound (juce::SynthesiserSound* sound)
 {
     return dynamic_cast<VectronSound*> (sound) != nullptr;
@@ -139,6 +156,24 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
         }
     }
     prevLfoRateMod[0] = prevLfoRateMod[1] = 0.0f;
+    if (params.trajMode != 0 && params.trajModel != nullptr)
+    {
+        const auto mac = trajMacros();
+        if (params.trajGlobal)
+        {
+            trajX.setCurrentAndTargetValue (params.trajMasterX);
+            trajY.setCurrentAndTargetValue (params.trajMasterY);
+        }
+        else
+        {
+            if (params.trajRetrigger) trajPlayhead.noteOn (*params.trajModel, mac);
+            else                      trajPlayhead.latchFrom (params.trajMasterState, mac);
+            float tx = 0.0f, ty = 0.0f;
+            trajPlayhead.advance (*params.trajModel, mac, 0.0f, tx, ty);
+            trajX.setCurrentAndTargetValue (tx);
+            trajY.setCurrentAndTargetValue (ty);
+        }
+    }
     level = velocity;
     ampAdsr.noteOn();
 }
@@ -150,6 +185,7 @@ void VectronVoice::stopNote (float, bool allowTailOff)
         ampAdsr.noteOff();
         filtAdsr.noteOff();
         modAdsr.noteOff();
+        trajPlayhead.release();
     }
     else
     {
@@ -173,6 +209,25 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
         if (params.modLfoGlobal[n])
             modLfo[n].setAbsolutePhase (params.modLfoMasterPhase[n]
                                         + (double) startSample * modLfo[n].getPhaseIncrement());
+
+    // Phase 6: advance the per-voice trajectory once per block (control rate, spec
+    // decision 1), smoothed per sample. Global trigger follows the master playhead.
+    if (params.trajMode != 0 && params.trajModel != nullptr)
+    {
+        if (params.trajGlobal)
+        {
+            trajX.setTargetValue (params.trajMasterX);
+            trajY.setTargetValue (params.trajMasterY);
+        }
+        else
+        {
+            float tx = 0.0f, ty = 0.0f;
+            trajPlayhead.advance (*params.trajModel, trajMacros(),
+                                  (float) (numSamples / voiceSampleRate), tx, ty);
+            trajX.setTargetValue (tx);
+            trajY.setTargetValue (ty);
+        }
+    }
 
     const float keytrackSrc = juce::jlimit (-1.0f, 1.0f, (float) (currentNote - 60) / 60.0f);
     const bool  stereo      = output.getNumChannels() >= 2;
@@ -237,8 +292,16 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
 
         const float lx = lfo[0].processSample();                 // Phase 2 axis LFOs
         const float ly = lfo[1].processSample();
-        const float fx = juce::jlimit (-1.0f, 1.0f, baseX.getNextValue() + lx + dest[MM::DstVectorX]);
-        const float fy = juce::jlimit (-1.0f, 1.0f, baseY.getNextValue() + ly + dest[MM::DstVectorY]);
+        // Phase 6 unified vector model (PRD §5.2): static<->trajectory blend, LFOs
+        // and matrix offsets always on top. Off mode == Phase 5 behavior exactly.
+        const float tjx   = trajX.getNextValue();
+        const float tjy   = trajY.getNextValue();
+        const float depth = params.trajMode == 0 ? 0.0f
+                          : juce::jlimit (0.0f, 1.0f, params.trajDepth + dest[MM::DstTrajDepth]);
+        const float fx = juce::jlimit (-1.0f, 1.0f,
+            baseX.getNextValue() * (1.0f - depth) + tjx * depth + lx + dest[MM::DstVectorX]);
+        const float fy = juce::jlimit (-1.0f, 1.0f,
+            baseY.getNextValue() * (1.0f - depth) + tjy * depth + ly + dest[MM::DstVectorY]);
         engine.setVectorPosition (fx, fy);
 
         // 5. noise mods (color/cutoff/level; NoiseGenerator smooths internally)
