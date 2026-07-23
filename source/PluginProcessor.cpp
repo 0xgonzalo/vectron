@@ -149,7 +149,7 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     // All reads use pre-resolved atomic pointers — no allocations, no locks on this thread.
 
     // Push current ADSR params into voices (control rate, per block).
-    const juce::ADSR::Parameters ampParams {
+    const AdsrEnvelope::Parameters ampParams {
         pAmpAttack->load(),
         pAmpDecay->load(),
         pAmpSustain->load(),
@@ -207,17 +207,62 @@ void VectronProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     vp.drivePosition   = (int) pDrivePosition->load();
     vp.filtVelAmt      =       pFiltVelAmt->load();
 
-    const juce::ADSR::Parameters filtParams {
+    const AdsrEnvelope::Parameters filtParams {
         pFiltAttack->load(),
         pFiltDecay->load(),
         pFiltSustain->load(),
         pFiltRelease->load() };
+    const AdsrEnvelope::Parameters modParams {
+        pModAttack->load(),
+        pModDecay->load(),
+        pModSustain->load(),
+        pModRelease->load() };
+
+    // Phase 5: tempo, mod LFOs, matrix
+    double bpm = 120.0;
+    if (auto* ph = getPlayHead())
+        if (auto pos = ph->getPosition())
+            if (auto hostBpm = pos->getBpm())
+                bpm = *hostBpm > 0.0 ? *hostBpm : 120.0;
+
+    // Beats per LFO cycle for each syncDiv choice (1/1 ... 1/32T), 4/4 quarter = 1 beat.
+    static constexpr double divBeats[16] = { 4.0, 3.0, 2.0, 4.0 / 3.0, 1.5, 1.0, 2.0 / 3.0,
+                                             0.75, 0.5, 1.0 / 3.0, 0.375, 0.25, 1.0 / 6.0,
+                                             0.1875, 0.125, 1.0 / 12.0 };
+    const double sr = getSampleRate();
+    for (int n = 0; n < 2; ++n)
+    {
+        const bool  sync = pModLfoSync[n]->load() > 0.5f;
+        const int   div  = juce::jlimit (0, 15, (int) pModLfoSyncDiv[n]->load());
+        const float hz   = sync ? (float) (bpm / (60.0 * divBeats[div]))
+                                : pModLfoRate[n]->load();
+        vp.modLfoShape[n]       = (int) pModLfoShape[n]->load();
+        vp.modLfoRateHz[n]      = hz;
+        vp.modLfoPhaseDeg[n]    = pModLfoPhase[n]->load();
+        vp.modLfoFadeIn[n]      = pModLfoFadeIn[n]->load();
+        vp.modLfoPolarity[n]    = (int) pModLfoPolarity[n]->load();
+        vp.modLfoGlobal[n]      = pModLfoMode[n]->load() > 0.5f;
+        vp.modLfoMasterPhase[n] = masterLfoPhase[n];
+        if (sr > 0.0)
+            masterLfoPhase[n] += (double) buffer.getNumSamples() * (double) hz / sr;
+    }
+
+    vp.modVelAmt  = pModVelAmt->load();
+    vp.ampVelSens = pAmpVelSens->load();
+    for (int s = 0; s < 8; ++s)
+    {
+        vp.slots[s].source  = (int) pModSrc[s]->load();
+        vp.slots[s].dest    = (int) pModDst[s]->load();
+        vp.slots[s].amount  = pModAmt[s]->load();
+        vp.slots[s].enabled = pModEn[s]->load() > 0.5f;
+    }
 
     for (int i = 0; i < synth.getNumVoices(); ++i)
         if (auto* v = dynamic_cast<VectronVoice*> (synth.getVoice (i)))
         {
             v->setAmpAdsr (ampParams);
             v->setFiltAdsr (filtParams);
+            v->setModAdsr (modParams);
             v->setMasterTune (tuneHz);
             v->setVectorParams (vp);
         }

@@ -6,6 +6,9 @@
 #include "noise/NoiseGenerator.h"
 #include "filter/FilterStage.h"
 #include "drive/DriveShaper.h"
+#include "mod/AdsrEnvelope.h"
+#include "mod/ModLfo.h"
+#include "mod/ModMatrix.h"
 
 struct VectronVoiceParams
 {
@@ -55,14 +58,31 @@ struct VectronVoiceParams
     float driveTrimDb     { 0.0f };
     int   drivePosition   { 0 };       // 0 Pre-filter, 1 Post-filter
     float filtVelAmt      { 0.0f };
+
+    // Phase 5: mod LFOs [lfo1=0, lfo2=1]
+    int    modLfoShape[2]       { 0, 0 };
+    float  modLfoRateHz[2]      { 1.0f, 1.0f };   // tempo-resolved by the processor
+    float  modLfoPhaseDeg[2]    { 0.0f, 0.0f };
+    float  modLfoFadeIn[2]      { 0.0f, 0.0f };
+    int    modLfoPolarity[2]    { 0, 0 };
+    bool   modLfoGlobal[2]      { false, false };
+    double modLfoMasterPhase[2] { 0.0, 0.0 };     // absolute phase at block start (Global mode)
+
+    // Phase 5: mod env velocity + amp velocity sensitivity
+    float modVelAmt  { 0.0f };
+    float ampVelSens { 1.0f };
+
+    // Phase 5: matrix slots
+    vectron::ModMatrix::Slot slots[vectron::ModMatrix::kNumSlots];
 };
 
 class VectronVoice : public juce::SynthesiserVoice
 {
 public:
     void prepare (double sampleRate, int blockSize);
-    void setAmpAdsr (const juce::ADSR::Parameters& p) { ampAdsr.setParameters (p); }
-    void setFiltAdsr (const juce::ADSR::Parameters& p) { filtAdsr.setParameters (p); }
+    void setAmpAdsr  (const AdsrEnvelope::Parameters& p) { ampAdsr.setParameters (p); }
+    void setFiltAdsr (const AdsrEnvelope::Parameters& p) { filtAdsr.setParameters (p); }
+    void setModAdsr  (const AdsrEnvelope::Parameters& p) { modAdsr.setParameters (p); }
     void setMasterTune (float a4Hz) { masterTuneHz = a4Hz; }
     void setVectorParams (const VectronVoiceParams& p) noexcept { params = p; applyParams(); }
 
@@ -71,7 +91,15 @@ public:
                     juce::SynthesiserSound*, int currentPitchWheelPosition) override;
     void stopNote (float velocity, bool allowTailOff) override;
     void pitchWheelMoved (int) override {}
-    void controllerMoved (int, int) override {}
+    void controllerMoved (int controllerNumber, int newControllerValue) override
+    {
+        if (controllerNumber == 1)
+            modWheel = (float) newControllerValue / 127.0f;
+    }
+    void channelPressureChanged (int newChannelPressureValue) override
+    {
+        aftertouch = (float) newChannelPressureValue / 127.0f;
+    }
     void renderNextBlock (juce::AudioBuffer<float>& output, int startSample, int numSamples) override;
 
 private:
@@ -86,10 +114,18 @@ private:
     juce::SmoothedValue<float> subLevel;
     FilterStage filterStage;
     DriveShaper driveShaper;
-    juce::ADSR  filtAdsr;
+    AdsrEnvelope filtAdsr;
     juce::SmoothedValue<float> filterCutoffHz, filterReso, driveAmount, driveTrimGain;
     int currentNote = 60;
-    juce::ADSR   ampAdsr;
+    AdsrEnvelope ampAdsr;
+    AdsrEnvelope modAdsr;
+    ModLfo modLfo[2];
+    float  modWheel = 0.0f, modWheelSm = 0.0f;      // raw target + ~5 ms smoothed
+    float  aftertouch = 0.0f, aftertouchSm = 0.0f;
+    float  ccSmoothCoef = 0.0f;
+    float  randNote = 0.0f;                          // per-note random, [-1, 1]
+    uint32_t noteRng = 0x9E3779B9u;
+    float  prevLfoRateMod[2] { 0.0f, 0.0f };         // 1-sample feedback for LFO-rate dests
     VectronVoiceParams params;
     float level = 0.0f;
     float masterTuneHz = 440.0f;
