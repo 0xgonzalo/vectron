@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include "PluginProcessor.h"
+#include "params/TrajectoryState.h"
 
 namespace
 {
@@ -78,11 +79,50 @@ namespace
         std::printf ("ok: %s rms=%.4f peak=%.3f\n", name, rms, peak);
         return true;
     }
+
+    bool trajectoryStateHelpersOk()
+    {
+        const auto tree = vectron::createDefaultTrajectory();
+        const auto m = vectron::trajectoryFromState (tree);
+        if (m.numPoints != 4)
+        { std::printf ("FAIL: default trajectory has %d points\n", m.numPoints); return false; }
+        const float ex[4] { -1.0f, 1.0f, 1.0f, -1.0f };
+        const float ey[4] {  1.0f, 1.0f, -1.0f, -1.0f };
+        for (int i = 0; i < 4; ++i)
+            if (m.points[i].x != ex[i] || m.points[i].y != ey[i] || m.points[i].timeMs != 500.0f)
+            { std::printf ("FAIL: default trajectory point %d wrong\n", i); return false; }
+
+        // Out-of-range values clamp; missing properties fall back to defaults.
+        juce::ValueTree t (vectron::traj_ids::tree);
+        juce::ValueTree p (vectron::traj_ids::point);
+        p.setProperty (vectron::traj_ids::x, 5.0f, nullptr);
+        p.setProperty (vectron::traj_ids::timeMs, 0.0f, nullptr);
+        t.appendChild (p, nullptr);
+        t.appendChild (juce::ValueTree (vectron::traj_ids::point), nullptr);
+        const auto m2 = vectron::trajectoryFromState (t);
+        if (m2.numPoints != 2 || m2.points[0].x != 1.0f || m2.points[0].timeMs != 1.0f
+            || m2.points[1].timeMs != 500.0f)
+        { std::printf ("FAIL: trajectory clamping/defaults wrong\n"); return false; }
+
+        // More than 16 POINT children cap at 16; an invalid tree parses to 0 points.
+        juce::ValueTree big (vectron::traj_ids::tree);
+        for (int i = 0; i < 20; ++i)
+            big.appendChild (juce::ValueTree (vectron::traj_ids::point), nullptr);
+        if (vectron::trajectoryFromState (big).numPoints != 16)
+        { std::printf ("FAIL: trajectory point cap wrong\n"); return false; }
+        if (vectron::trajectoryFromState (juce::ValueTree()).numPoints != 0)
+        { std::printf ("FAIL: invalid tree should parse to 0 points\n"); return false; }
+
+        std::printf ("ok: trajectory state helpers\n");
+        return true;
+    }
 }
 
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
+
+    if (! trajectoryStateHelpersOk()) return 1;
 
     // Baseline: default patch, matrix off.
     VectronProcessor base;
