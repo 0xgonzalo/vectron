@@ -85,6 +85,7 @@ void VectronVoice::applyParams() noexcept
         modLfo[n].setPhaseOffsetDegrees (params.modLfoPhaseDeg[n]);
         modLfo[n].setFadeInSeconds (params.modLfoFadeIn[n]);
         modLfo[n].setRate (params.modLfoRateHz[n]);
+        appliedRateMod[n] = 0.0f;                    // base rate just (re)applied
     }
 }
 
@@ -120,13 +121,24 @@ void VectronVoice::startNote (int midiNoteNumber, float velocity,
     filtAdsr.noteOn();
     modAdsr.reset();
     modAdsr.noteOn();
-    for (int n = 0; n < 2; ++n)
-    {
-        if (params.modLfoGlobal[n]) modLfo[n].startFadeIn();   // phase stays global
-        else                        modLfo[n].retrigger();
-    }
     noteRng = noteRng * 1664525u + 1013904223u;
     randNote = (float) ((noteRng >> 8) & 0xFFFFFFu) / 16777215.0f * 2.0f - 1.0f;
+    for (int n = 0; n < 2; ++n)
+    {
+        if (params.modLfoGlobal[n])
+        {
+            modLfo[n].setSeed ((uint32_t) n + 1u);             // fixed: voices line up
+            modLfo[n].startFadeIn();                           // phase stays global
+        }
+        else
+        {
+            // Per-note seed so S&H / Random shapes don't replay the same
+            // sequence every note (fixed seed is only needed in Global mode).
+            modLfo[n].setSeed (((uint32_t) n + 1u) ^ (noteRng * 2654435761u));
+            modLfo[n].retrigger();
+        }
+    }
+    prevLfoRateMod[0] = prevLfoRateMod[1] = 0.0f;
     level = velocity;
     ampAdsr.noteOn();
 }
@@ -174,9 +186,19 @@ void VectronVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startS
         const float modEnv  = modAdsr.getNextSample()
                             * (1.0f - params.modVelAmt + params.modVelAmt * level);
 
-        // 2. LFOs — rate cross-mod uses the previous sample's matrix output
-        modLfo[0].setRate (params.modLfoRateHz[0] * std::exp2 (prevLfoRateMod[0] * 3.0f));
-        modLfo[1].setRate (params.modLfoRateHz[1] * std::exp2 (prevLfoRateMod[1] * 3.0f));
+        // 2. LFOs — rate cross-mod uses the previous sample's matrix output.
+        // Global-mode LFOs skip it: their phase is pinned to the master
+        // accumulator (base rate), so modding the local rate would just be
+        // snapped back at the next block boundary (spec decision 17).
+        for (int n = 0; n < 2; ++n)
+        {
+            const float rm = params.modLfoGlobal[n] ? 0.0f : prevLfoRateMod[n];
+            if (rm != appliedRateMod[n])               // skip the exp2/divide when unrouted
+            {
+                modLfo[n].setRate (params.modLfoRateHz[n] * std::exp2 (rm * 3.0f));
+                appliedRateMod[n] = rm;
+            }
+        }
         const float l1 = modLfo[0].processSample();
         const float l2 = modLfo[1].processSample();
 

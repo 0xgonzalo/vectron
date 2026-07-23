@@ -23,7 +23,7 @@ Add the modulation system: two full-featured **LFOs** (poly/global, tempo-syncab
 2. **Exponential `AdsrEnvelope` replaces `juce::ADSR`** for Amp + Filter, and provides the new Mod Env (honors Phase 4 locked decision #1). One-pole exponential segments (EarLevel/Redmon-style overshoot targets). A fresh Phase 5 patch will not null-test against Phase 4 — accepted; the PRD mandates exponential curves.
 3. **Tempo sync adds a `lfoN_syncDiv` choice param** (PRD §8 lists `lfoN_sync` only; a division selector is required to be usable). Divisions: `1/1, 1/2., 1/2, 1/2T, 1/4., 1/4, 1/4T, 1/8., 1/8, 1/8T, 1/16., 1/16, 1/16T, 1/32., 1/32, 1/32T`. Host BPM from the playhead, fallback 120.
 4. **Global LFO mode = shared absolute phase.** The processor advances one master phase accumulator per LFO (double, cycles); each voice in Global mode derives its LFO phase as `master + phaseOffset + startSample·inc`, so chunked `renderNextBlock` calls stay coherent. Poly mode retriggers at note-on from `lfoN_phase`.
-5. **Hash-based S&H / Random-smooth LFO shapes.** The random value for cycle *k* is `rand(hash(k))` on the unwrapped cycle index — deterministic, phase-jump-safe, and identical across voices in Global mode. Random (smooth) interpolates `rand(hash(k)) → rand(hash(k+1))` with cosine easing.
+5. **Hash-based S&H / Random-smooth LFO shapes.** The random value for cycle *k* is `rand(hash(k))` on the unwrapped cycle index — deterministic, phase-jump-safe, and identical across voices in Global mode. Random (smooth) interpolates `rand(hash(k)) → rand(hash(k+1))` with cosine easing. In **Poly** mode the seed is re-mixed with a per-note nonce at note-on so S&H/Random shapes don't replay the identical sequence every note; the fixed seed is Global-mode-only (review finding, Phase 5).
 6. **LFO fade-in is per-note in both modes** (depth ramp from note-on); only *phase* retrigger is Poly-mode-only.
 7. **Destination scaling (full-scale at amount ±1):** pitch ±12 st · PW ±0.45 · levels/color/reso/drive ±1 additive then clamp to range · Vector X/Y ±1 additive then clamp ±1 · filter & noise cutoff ±5 octaves (matches the Phase 4 env convention) · LFO rate ±3 octaves · Amp Level gain `clamp(1+mod, 0, 2)` · Pan ±1 full L↔R equal-power.
 8. **LFO rate cross-mod uses the previous sample's matrix output** (one-sample feedback delay — standard, documented).
@@ -35,6 +35,7 @@ Add the modulation system: two full-featured **LFOs** (poly/global, tempo-syncab
 14. **ModWheel/Aftertouch smoothed** (~5 ms one-pole at voice level) to kill CC zipper.
 15. **Existing per-axis vector LFOs (Phase 2) stay unchanged** — matrix Vector X/Y offsets add on top: `clamp(base + axisLfo + matrix, −1, 1)`.
 16. **Unison (§6.4) stays in Phase 7** per PRD §12.
+17. **LFO-rate cross-mod is Poly-mode-only.** A Global-mode LFO's phase is pinned to the processor's master accumulator (advanced at the base rate), so per-voice rate mod would be snapped back at every block boundary — the voice therefore ignores `LFO N Rate` matrix routings for LFOs in Global mode (review finding, Phase 5).
 
 ## Architecture
 
@@ -62,7 +63,7 @@ Add the modulation system: two full-featured **LFOs** (poly/global, tempo-syncab
 
 | Group | IDs | Type / range |
 |---|---|---|
-| LFO ×2 | `lfo{1,2}_shape` (choice ×7), `_rate` (0.01–40 Hz log, default 1), `_sync` (bool), `_syncDiv` (choice ×15, default 1/4), `_phase` (0–360°), `_fadeIn` (0–5 s), `_polarity` (Bipolar/Unipolar), `_mode` (Poly/Global) | 16 params |
+| LFO ×2 | `lfo{1,2}_shape` (choice ×7), `_rate` (0.01–40 Hz log, default 1), `_sync` (bool), `_syncDiv` (choice ×16, default 1/4), `_phase` (0–360°), `_fadeIn` (0–5 s), `_polarity` (Bipolar/Unipolar), `_mode` (Poly/Global) | 16 params |
 | Mod Env | `mod_attack` (0–10 s log), `mod_decay` (0–10 s), `mod_sustain` (0–1), `mod_release` (0–15 s), `mod_velAmt` (0–1) | 5 params |
 | Amp | `amp_velSens` (0–1, default 1) | 1 param |
 | Matrix ×8 | `mod{1..8}_src` (choice ×11), `_dst` (choice ×25), `_amt` (−1…+1, default 0), `_en` (bool, default off) | 32 params |

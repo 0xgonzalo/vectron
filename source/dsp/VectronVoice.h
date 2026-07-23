@@ -126,6 +126,7 @@ private:
     float  randNote = 0.0f;                          // per-note random, [-1, 1]
     uint32_t noteRng = 0x9E3779B9u;
     float  prevLfoRateMod[2] { 0.0f, 0.0f };         // 1-sample feedback for LFO-rate dests
+    float  appliedRateMod[2] { 0.0f, 0.0f };         // last rate mod pushed into the LFO
     VectronVoiceParams params;
     float level = 0.0f;
     float masterTuneHz = 440.0f;
